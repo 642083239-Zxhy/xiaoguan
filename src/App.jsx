@@ -3,7 +3,6 @@ import Header from './components/Header';
 import ChatArea from './components/ChatArea';
 import HistorySidebar from './components/HistorySidebar';
 import StatusPanel from './components/StatusPanel';
-import AdminPanel from './components/AdminPanel';
 import { sendMessageToAI, getHistorySessions, saveSession, deleteSession } from './services/api';
 
 /**
@@ -25,7 +24,6 @@ function App() {
   // 侧边栏状态
   const [showHistory, setShowHistory] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(false);
   
   // 当前选购条件
   const [currentCriteria, setCurrentCriteria] = useState({});
@@ -201,7 +199,7 @@ function App() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* 顶部导航 */}
-      <Header onOpenAdmin={() => setShowAdmin(true)} />
+      <Header />
       
       {/* 主内容区域 */}
       <main className="flex-1 mt-14">
@@ -235,12 +233,6 @@ function App() {
         candidates={candidates}
         onRemoveCriteria={handleRemoveCriteria}
         onClearCandidates={handleClearCandidates}
-      />
-      
-      {/* 后台管理 */}
-      <AdminPanel
-        isOpen={showAdmin}
-        onClose={() => setShowAdmin(false)}
       />
     </div>
   );
