@@ -1,0 +1,8 @@
+[project]
+name = "xgshujuku"
+version = "0.1.0"
+description = "Local session, memory and customer-data store for an AI sales assistant"
+requires-python = ">=3.10"
+
+[tool.unittest]
+start-directory = "tests"
