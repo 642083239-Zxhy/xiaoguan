@@ -197,7 +197,18 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col dragon-bg cyber-grid-bg relative overflow-hidden">
+      {/* 背景装饰 - 浮动光珠 */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+        <div className="floating-orb" />
+        <div className="floating-orb" style={{ animationDelay: '-10s' }} />
+        {/* 星星点缀 */}
+        <div className="absolute top-[15%] left-[10%] w-1 h-1 bg-violet-400 rounded-full twinkle" />
+        <div className="absolute top-[40%] right-[20%] w-1 h-1 bg-fuchsia-400 rounded-full twinkle" style={{ animationDelay: '0.5s' }} />
+        <div className="absolute bottom-[30%] left-[30%] w-1.5 h-1.5 bg-cyan-400 rounded-full twinkle" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-[60%] right-[10%] w-1 h-1 bg-violet-300 rounded-full twinkle" style={{ animationDelay: '1.5s' }} />
+      </div>
+      
       {/* 顶部导航 */}
       <Header />
       
