@@ -1,0 +1,102 @@
+import React from 'react';
+import { Plus, Trash2, MessageSquare, Clock } from 'lucide-react';
+
+/**
+ * 历史记录侧边栏组件
+ * 显示会话历史列表，支持继续对话和删除
+ */
+const HistorySidebar = ({ 
+  isOpen, 
+  onClose, 
+  sessions, 
+  onSelectSession, 
+  onDeleteSession,
+  onNewSession 
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      {/* 遮罩层 */}
+      <div 
+        className="absolute inset-0 bg-black/30"
+        onClick={onClose}
+      />
+      
+      {/* 侧边栏 */}
+      <div className="relative w-72 bg-white h-full shadow-xl flex flex-col">
+        {/* 头部 */}
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-800">历史对话</h2>
+            <button 
+              onClick={onClose}
+              className="p-1 hover:bg-gray-100 rounded"
+            >
+              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          <button
+            onClick={onNewSession}
+            className="w-full flex items-center justify-center gap-2 bg-primary text-white py-2.5 rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            新建对话
+          </button>
+        </div>
+        
+        {/* 会话列表 */}
+        <div className="flex-1 overflow-y-auto p-3">
+          {sessions.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>暂无历史对话</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {sessions.map((session) => (
+                <div
+                  key={session.id}
+                  onClick={() => onSelectSession(session)}
+                  className="group p-3 rounded-lg border border-gray-200 hover:border-primary/30 hover:bg-primary/5 cursor-pointer transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-gray-800 truncate">{session.title}</h3>
+                      <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
+                        <Clock className="w-3 h-3" />
+                        <span>{session.lastTime}</span>
+                      </div>
+                      {session.lastQuery && (
+                        <p className="text-xs text-gray-500 mt-1 truncate">{session.lastQuery}</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteSession(session.id);
+                      }}
+                      className="p-1 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* 底部提示 */}
+        <div className="p-3 border-t border-gray-100 text-xs text-gray-400 text-center">
+          匿名用户仅显示最近7天记录
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default HistorySidebar;
