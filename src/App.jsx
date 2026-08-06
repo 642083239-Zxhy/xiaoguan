@@ -245,7 +245,7 @@ function App() {
       default:
         break;
     }
-  }, [handleNewSession, handleSendMessage]);
+  }, [currentSessionId, handleNewSession, handleSendMessage]);
 
   const handleSelectSession = useCallback((session) => {
     localStorage.setItem('chat_session_id', session.id);

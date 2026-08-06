@@ -1,5 +1,5 @@
 import React from 'react';
-import { XCircle, AlertCircle, CheckCircle, Clock, User, ShoppingBag, Zap, ChevronRight, ArrowRight } from 'lucide-react';
+import { XCircle, AlertCircle, CheckCircle, Clock, User, ShoppingBag, ArrowRight } from 'lucide-react';
 import { ProductCard } from './ProductCard';
 
 /**

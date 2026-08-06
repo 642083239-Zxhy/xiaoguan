@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, ShoppingCart, Headphones, MessageSquare, Sparkles, Zap, ChevronRight } from 'lucide-react';
+import { Send, User, ShoppingCart, Headphones, MessageSquare, Sparkles, ChevronRight } from 'lucide-react';
 import { 
   SelectionConsultation,
   ProductRecommendation,

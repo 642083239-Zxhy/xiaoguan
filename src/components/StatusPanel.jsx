@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrainCircuit, Package, Tag, X } from 'lucide-react';
+import { BrainCircuit, Package, Tag, X, Zap } from 'lucide-react';
 
 /**
  * 会话状态面板组件

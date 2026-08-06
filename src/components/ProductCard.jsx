@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart, Headphones } from 'lucide-react';
+import { ShoppingCart, Headphones, Zap } from 'lucide-react';
 
 /**
  * 商品推荐卡片组件
