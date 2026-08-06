@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, User, MessageSquare, Sparkles, ChevronRight } from 'lucide-react';
+import { Send, User, MessageSquare, Sparkles, ChevronRight, Home } from 'lucide-react';
 import {
   SelectionConsultation,
   ProductRecommendation,
@@ -19,7 +19,9 @@ import {
   SessionSummary
 } from './IntentComponents';
 import { quickQuestions, priceRanges } from '../data/mockData';
-import dragonLogo from '../assets/dragon-logo.jpg';
+import dragonLogo from '../assets/dragon-logo.png';
+import Strands from './backgrounds/Strands';
+import LightTunnel from './backgrounds/LightTunnel';
 
 const renderInline = (text) => text.split(/(\*\*.*?\*\*)/g).map((part, index) => (
   part.startsWith('**') && part.endsWith('**')
@@ -47,9 +49,7 @@ const Message = ({ message, onIntentAction }) => {
   const isSystem = message.type === 'system';
   const sourceLabels = {
     'knowledge-base': '百炼知识库',
-    'local-knowledge': '本地知识',
-    'rule-engine': '规则引擎',
-    api: '通用模型'
+    system: '系统提示'
   };
 
   return (
@@ -66,13 +66,13 @@ const Message = ({ message, onIntentAction }) => {
       </div>
 
       {/* 消息内容 */}
-      <div className={`flex-1 max-w-[88%] sm:max-w-[80%] ${isUser ? 'items-end' : ''}`}>
+      <div className={`flex min-w-0 max-w-[88%] flex-col sm:max-w-[80%] ${isUser ? 'items-end' : 'items-start'}`}>
         {message.intent ? (
           <div className="mb-2">
             {renderIntentComponent(message, onIntentAction)}
           </div>
         ) : (
-          <div className={`${
+          <div className={`w-fit max-w-full ${
             isUser
               ? 'bg-primary text-white rounded-2xl rounded-tr-sm'
               : 'bg-gray-100 text-gray-800 rounded-2xl rounded-tl-sm'
@@ -206,7 +206,8 @@ const ChatArea = ({
   onOpenStatusPanel,
   currentCriteria,
   candidateCount,
-  apiConfigured
+  apiConfigured,
+  onGoHome
 }) => {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef(null);
@@ -229,35 +230,74 @@ const ChatArea = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full">
+    <div className="flex-1 flex flex-col h-full bg-[#08090f]">
       {/* 欢迎区 - 仅首次对话时显示 */}
       {messages.length === 0 && (
-        <div className="border-b border-gray-100 px-4 py-5 sm:px-6">
-          <div className="max-w-3xl mx-auto">
-            <div className="neon-border relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400/10 via-purple-500/10 to-fuchsia-500/5 p-5 sm:p-6">
-              <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-purple-500/15 blur-3xl" />
-              <div className="relative">
+        <div className="welcome-effects-shell relative isolate overflow-hidden border-b border-gray-100 px-4 py-6 sm:px-6 sm:py-7">
+          <div className="welcome-tunnel-layer pointer-events-none absolute inset-0" aria-hidden="true">
+            <LightTunnel
+              cableColor="#3B82F6"
+              pulseColor="#F8FAFC"
+              tunnelColor="#8B5CF6"
+              tunnelOpacity={0.08}
+              speed={0.07}
+              flowDirection="outward"
+              pulseSpeed={1.15}
+              pulseLength={0.4}
+              pulseBlend={1}
+              pulseWidth={0.82}
+              cableCount={18}
+              thickness={0.32}
+              rimWidth={0.18}
+              waviness={0.14}
+              sway={0.08}
+              size={0.9}
+              centerX={0}
+              centerY={0}
+              glow={0.8}
+              fadeNear={0.32}
+              fadeFar={2.2}
+              brightness={0.95}
+              colorVariance
+              grain
+              grainIntensity={0.02}
+              opacity={0.82}
+              mouseInteraction={false}
+            />
+          </div>
+          <div className="welcome-stage-veil pointer-events-none absolute inset-0" aria-hidden="true" />
+          <div className="relative z-10 mx-auto max-w-3xl">
+            <div className="welcome-thread-card neon-border relative mb-5 overflow-hidden rounded-2xl p-5 sm:p-6">
+              <div className="welcome-thread-layer pointer-events-none absolute inset-0" aria-hidden="true">
+                <Strands
+                  colors={["#3B82F6", "#8B5CF6", "#F8FAFC"]}
+                  count={5}
+                  speed={0.28}
+                  amplitude={0.72}
+                  waviness={0.86}
+                  thickness={0.58}
+                  glow={2.35}
+                  taper={2.6}
+                  spread={0.68}
+                  intensity={0.68}
+                  saturation={1.25}
+                  opacity={0.84}
+                  scale={1.18}
+                  glass={false}
+                  mouseInteraction
+                  interactionStrength={0.76}
+                />
+              </div>
+              <div className="welcome-card-veil pointer-events-none absolute inset-0" aria-hidden="true" />
+              <div className="relative z-10">
                 <div className="mb-2 flex items-center gap-2">
                   <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-bold tracking-widest text-cyan-300">L1 SERIES</span>
                   <span className={`rounded-full border px-2.5 py-1 text-[10px] ${apiConfigured ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300' : 'border-purple-400/25 bg-purple-400/10 text-purple-300'}`}>
-                    {apiConfigured ? '知识库已连接' : '规则引擎模式'}
+                    {apiConfigured ? '知识库已连接' : '知识库未连接'}
                   </span>
                 </div>
                 <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">选对鼠标，不用背参数</h1>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-gray-600">告诉我预算、游戏类型和设备，我会根据L1系列真实参数、定价规则与知识库给出建议。</p>
-                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {[
-                    ['L1 基础版', '399元'],
-                    ['L1 Pro', '599元'],
-                    ['轻量化', '最低≤55g'],
-                    ['旗舰传感器', 'PAW3950']
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-xl border border-white/5 bg-black/10 px-3 py-2">
-                      <div className="text-[10px] text-gray-500">{label}</div>
-                      <div className="mt-0.5 text-xs font-semibold text-gray-700">{value}</div>
-                    </div>
-                  ))}
-                </div>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-gray-600">告诉我预算、使用场景和设备；回答将严格依据已连接的百炼知识库及应用提示词。</p>
               </div>
             </div>
 
@@ -286,31 +326,41 @@ const ChatArea = ({
 
       {/* 状态面板入口 */}
       {messages.length > 0 && (
-        <div className="flex justify-end px-6 py-2">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <button
-            onClick={onOpenStatusPanel}
-            className="flex items-center gap-2 bg-gradient-to-br from-[#1A1A2E] to-[#16162A] border border-violet-500/20 hover:border-violet-500/50 hover:bg-violet-500/10 rounded-xl px-3 py-1.5 text-sm text-gray-300 hover:text-violet-300 transition-all"
+            onClick={onGoHome}
+            className="flex items-center gap-2 rounded-xl border border-violet-400/25 bg-violet-500/10 px-3 py-2 text-sm text-violet-100 transition hover:border-violet-300/50 hover:bg-violet-500/20"
+            aria-label="返回首页"
           >
-            <span>当前条件（{Object.keys(currentCriteria || {}).length}）</span>
-            {candidateCount > 0 && (
-              <span className="bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-xs px-2 py-0.5 rounded-full">
-                {candidateCount} 款候选
-              </span>
-            )}
+            <Home className="h-4 w-4" />
+            <span>返回首页</span>
           </button>
-          {Object.keys(currentCriteria || {}).length > 0 && (
+          <div className="flex items-center justify-end gap-2">
             <button
-              onClick={() => onIntentAction('clear_criteria')}
-              className="ml-2 rounded-lg px-3 py-1.5 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-red-400"
+              onClick={onOpenStatusPanel}
+              className="flex items-center gap-2 bg-gradient-to-br from-[#1A1A2E] to-[#16162A] border border-violet-500/20 hover:border-violet-500/50 hover:bg-violet-500/10 rounded-xl px-3 py-1.5 text-sm text-gray-300 hover:text-violet-300 transition-all"
             >
-              清除条件
+              <span>当前条件（{Object.keys(currentCriteria || {}).length}）</span>
+              {candidateCount > 0 && (
+                <span className="bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-xs px-2 py-0.5 rounded-full">
+                  {candidateCount} 款候选
+                </span>
+              )}
             </button>
-          )}
+            {Object.keys(currentCriteria || {}).length > 0 && (
+              <button
+                onClick={() => onIntentAction('clear_criteria')}
+                className="rounded-lg px-3 py-1.5 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-red-400"
+              >
+                清除条件
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       {/* 消息列表 */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 fade-mask-bottom scroll-container">
+      <div className={`flex-1 overflow-y-auto px-4 py-4 fade-mask-bottom scroll-container sm:px-6 ${messages.length > 0 ? 'conversation-surface mx-3 rounded-2xl sm:mx-6' : ''}`}>
         <div className="max-w-3xl mx-auto space-y-4">
           {messages.map((msg, index) => (
             msg.type === 'loading'
@@ -326,7 +376,7 @@ const ChatArea = ({
       </div>
 
       {/* 输入区 */}
-      <div className="px-6 py-4 bg-[#0A0A12]/90">
+      <div className="chat-composer px-4 py-4 sm:px-6">
         <div className="max-w-3xl mx-auto">
           {/* 常用问题 */}
           <div className="mb-3">

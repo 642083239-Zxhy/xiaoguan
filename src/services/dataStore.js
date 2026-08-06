@@ -1,11 +1,8 @@
-import { mockFaqs, mockScripts, mockSkus } from '../data/mockData.js';
-
 const STORAGE_KEYS = {
-  skus: 'mouse_ai_skus',
-  faqs: 'mouse_ai_faqs',
-  scripts: 'mouse_ai_scripts',
   analytics: 'mouse_ai_analytics'
 };
+
+const DEPRECATED_KNOWLEDGE_KEYS = ['mouse_ai_skus', 'mouse_ai_faqs', 'mouse_ai_scripts'];
 
 const read = (key, fallback) => {
   try {
@@ -21,12 +18,9 @@ const write = (key, value) => {
   return value;
 };
 
-export const getSkus = () => read('skus', mockSkus);
-export const saveSkus = (items) => write('skus', items);
-export const getFaqs = () => read('faqs', mockFaqs);
-export const saveFaqs = (items) => write('faqs', items);
-export const getScripts = () => read('scripts', mockScripts);
-export const saveScripts = (items) => write('scripts', items);
+export const clearDeprecatedKnowledgeData = () => {
+  DEPRECATED_KNOWLEDGE_KEYS.forEach(key => localStorage.removeItem(key));
+};
 
 const EMPTY_ANALYTICS = { purchaseClicks: 0, contactClicks: 0, sessions: [], convertedSessions: [] };
 

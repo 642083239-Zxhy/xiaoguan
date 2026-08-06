@@ -1,12 +1,13 @@
 import React from 'react';
-import { Brain, Headphones, History, KeyRound, Settings, Sparkles, Zap } from 'lucide-react';
+import { Brain, Headphones, History, KeyRound, Settings, Sparkles } from 'lucide-react';
+import dragonLogo from '../assets/dragon-logo.png';
 
 const Header = ({ onOpenHistory, onContact, onOpenAdmin, onOpenApiSettings, onOpenMemory, apiConfigured, memoryStatus }) => (
   <header className="glass-dark fixed inset-x-0 top-0 z-50 border-b">
     <div className="flex h-16 items-center justify-between px-4 sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-cyan-400/30 bg-gradient-to-br from-cyan-400/15 to-purple-500/20 shadow-neon-cyan">
-          <Zap className="h-6 w-6 text-primary" />
+        <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-2xl border border-cyan-400/30 bg-dragon-dark shadow-neon-cyan">
+          <img src={dragonLogo} alt="雷龙 Logo" className="h-full w-full object-cover" />
           <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-secondary shadow-neon-purple" />
         </div>
         <div className="min-w-0">
@@ -42,7 +43,7 @@ const Header = ({ onOpenHistory, onContact, onOpenAdmin, onOpenApiSettings, onOp
         </button>
         <div className="ml-1 hidden items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-2.5 py-1.5 sm:flex">
           <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-          <span className="text-[11px] font-medium text-emerald-300">{apiConfigured ? '知识库已连接' : '规则引擎在线'}</span>
+          <span className="text-[11px] font-medium text-emerald-300">{apiConfigured ? '知识库已连接' : '知识库未连接'}</span>
         </div>
       </div>
     </div>

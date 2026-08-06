@@ -94,7 +94,7 @@ const saveFact = (sessionId, factType, value, confirmationStatus = 'confirmed') 
   }
 );
 
-export const syncMemoryTurn = async ({ frontendSessionId, criteria, candidates, analysis, quote, summary }) => {
+export const syncMemoryTurn = async ({ frontendSessionId, criteria, candidates, analysis, responseIntent, quote, summary }) => {
   const { sessionId } = await initializeMemorySession(frontendSessionId);
   const facts = [];
   if (analysis?.primary_intent) facts.push(['main_intent', analysis.primary_intent, 'expressed']);
@@ -105,10 +105,10 @@ export const syncMemoryTurn = async ({ frontendSessionId, criteria, candidates, 
   }
   if (candidates?.length) facts.push(['candidate_skus', candidates.map(item => item.id || item.sku || item.name), 'expressed']);
   await Promise.all(facts.map(([type, value, status]) => saveFact(sessionId, type, value, status)));
-  if (analysis?.primary_intent === 'product_recommendation' && candidates?.length) {
+  if ((responseIntent === 'product_recommendation' || analysis?.primary_intent === 'product_recommendation') && candidates?.length) {
     await request(`/sessions/${encodeURIComponent(sessionId)}/recommendations`, {
       method: 'POST',
-      body: JSON.stringify({ result: candidates, knowledge_source_version: 'local-catalog-2026-08-05' })
+      body: JSON.stringify({ result: candidates, knowledge_source_version: 'bailian-knowledge-base' })
     });
   }
   if (quote?.quoteVersion) {
@@ -120,7 +120,10 @@ export const syncMemoryTurn = async ({ frontendSessionId, criteria, candidates, 
   if (summary) {
     await request(`/sessions/${encodeURIComponent(sessionId)}/summary`, {
       method: 'POST',
-      body: JSON.stringify({ ...summary, knowledge_source_version: 'local-catalog-2026-08-05' })
+    body: JSON.stringify({
+      ...summary,
+      knowledge_source_version: summary.knowledge_source_version || 'bailian-knowledge-base'
+    })
     });
   }
 };

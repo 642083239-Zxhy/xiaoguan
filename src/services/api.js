@@ -1,54 +1,36 @@
-/**
- * API服务层
- * 封装所有与后端API的交互
- * 目前使用Mock数据，后续替换为真实API
- */
-
-import { mockSkus, mockFaqs, mockScripts } from '../data/mockData.js';
-import { getAnalytics, getFaqs, getSkus } from './dataStore.js';
+import { getAnalytics } from './dataStore.js';
 import { getBailianAnalysisContext } from './memoryApi.js';
-import { routeSalesMessage } from './salesEngine.js';
 
 const API_CONFIG_KEY = 'mouse_ai_api_config';
 const BAILIAN_SESSION_KEY = 'mouse_ai_bailian_session_id';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const KNOWLEDGE_UNAVAILABLE_MESSAGE = '知识库未连接，暂时无法提供商品信息';
 
 const getBailianSessionKey = () => `${BAILIAN_SESSION_KEY}:${localStorage.getItem('chat_session_id') || 'current'}`;
 
 export const DEFAULT_API_CONFIG = {
   mode: 'bailian-app',
   appId: '',
-  endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
-  apiKey: '',
-  model: 'qwen-plus'
+  apiKey: ''
 };
-
-const SYSTEM_PROMPT = `你是一名专业、耐心、可信的电脑鼠标AI销售助手。
-优先确认用户的使用场景、预算和设备兼容条件，再根据可靠商品数据给出推荐。
-回答要简洁自然，先说结论，再解释理由；不知道的信息必须明确说明无法确认，不得编造参数、价格、库存或优惠。
-本期不支持自动转人工、人工排队、文件自动解析或语音回复。`;
 
 export const getApiConfig = () => {
   try {
     const saved = sessionStorage.getItem(API_CONFIG_KEY);
-    return saved ? { ...DEFAULT_API_CONFIG, ...JSON.parse(saved) } : DEFAULT_API_CONFIG;
+    return saved ? { ...DEFAULT_API_CONFIG, ...JSON.parse(saved), mode: 'bailian-app' } : DEFAULT_API_CONFIG;
   } catch {
     return DEFAULT_API_CONFIG;
   }
 };
 
-export const saveApiConfig = (config) => {
+export const saveApiConfig = config => {
   const normalized = {
-    mode: config.mode === 'openai-compatible' ? 'openai-compatible' : 'bailian-app',
+    mode: 'bailian-app',
     appId: (config.appId || '').trim(),
-    endpoint: config.endpoint.trim(),
-    apiKey: config.apiKey.trim(),
-    model: config.model.trim()
+    apiKey: (config.apiKey || '').trim()
   };
   const previous = getApiConfig();
-  if (previous.mode !== normalized.mode || previous.appId !== normalized.appId) {
-    sessionStorage.removeItem(getBailianSessionKey());
-  }
+  if (previous.appId !== normalized.appId) sessionStorage.removeItem(getBailianSessionKey());
   sessionStorage.setItem(API_CONFIG_KEY, JSON.stringify(normalized));
   return normalized;
 };
@@ -62,35 +44,10 @@ export const clearApiConfig = () => {
 
 export const hasApiConfig = () => {
   const config = getApiConfig();
-  if (config.mode === 'bailian-app') {
-    return Boolean(config.appId && config.apiKey);
-  }
-  return Boolean(config.endpoint && config.model && config.apiKey);
+  return Boolean(config.appId && config.apiKey);
 };
 
-export const resetKnowledgeSession = () => {
-  sessionStorage.removeItem(getBailianSessionKey());
-};
-
-const requestChatCompletion = async (config, messages) => {
-  const response = await fetch('/api/proxy-chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...config, messages })
-  });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail = payload?.error?.message || payload?.message || `请求失败（${response.status}）`;
-    throw new Error(detail);
-  }
-
-  const content = payload?.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error('API返回格式不正确，未找到回答内容');
-  }
-  return content;
-};
+export const resetKnowledgeSession = () => sessionStorage.removeItem(getBailianSessionKey());
 
 const toShanghaiIso = value => {
   const date = value instanceof Date ? value : new Date(value);
@@ -104,7 +61,6 @@ export const buildBailianUserPromptParams = ({
   message = '',
   conversationHistory = [],
   currentCriteria = {},
-  productCatalog = [],
   analytics = {},
   currentTime = new Date()
 }) => {
@@ -176,8 +132,7 @@ export const buildBailianUserPromptParams = ({
     }),
     authorized_long_term_memories: toPromptValue(databaseContext.authorized_long_term_memories || []),
     recommendation_runs: toPromptValue(databaseContext.recommendation_runs || []),
-    quote_versions: toPromptValue(databaseContext.quote_versions || []),
-    product_catalog: toPromptValue(productCatalog)
+    quote_versions: toPromptValue(databaseContext.quote_versions || [])
   };
 };
 
@@ -194,7 +149,6 @@ const loadBailianUserPromptParams = async ({ message, conversationHistory, curre
     message,
     conversationHistory,
     currentCriteria,
-    productCatalog: getSkus(),
     analytics: getAnalytics()
   });
 };
@@ -214,69 +168,252 @@ const requestBailianApplication = async (config, prompt, userPromptParams = null
       bizParams
     })
   });
-
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail = payload?.message || payload?.code || `请求失败（${response.status}）`;
-    throw new Error(detail);
-  }
-
+  if (!response.ok) throw new Error(payload?.message || payload?.code || `请求失败（${response.status}）`);
   const content = payload?.output?.text;
-  if (!content) {
-    throw new Error('百炼应用未返回回答，请检查应用是否已发布并已绑定知识库');
-  }
-  if (payload.output.session_id) {
-    sessionStorage.setItem(getBailianSessionKey(), payload.output.session_id);
-  }
+  if (!content) throw new Error('百炼应用未返回回答，请检查应用是否已发布并已绑定知识库');
+  if (payload.output.session_id) sessionStorage.setItem(getBailianSessionKey(), payload.output.session_id);
   return content;
 };
 
-export const testApiConnection = async (config) => {
-  if (config.mode === 'bailian-app') {
-    const content = await requestBailianApplication(config, '请简短回复：知识库应用连接成功');
-    resetKnowledgeSession();
-    return content;
+const stripJsonFence = value => String(value || '')
+  .trim()
+  .replace(/^```(?:json)?\s*/i, '')
+  .replace(/\s*```$/, '');
+
+const INTENT_DATA_CHECKS = {
+  product_recommendation: data => Array.isArray(data.products),
+  product_comparison: data => Boolean(data.productA && data.productB),
+  parameter_query: data => typeof data.answer === 'string',
+  compatibility_check: data => Boolean(data.product),
+  price_inquiry: data => Boolean(data.product || Array.isArray(data.products)),
+  bargain: data => typeof data.message === 'string',
+  stock_logistics: data => Boolean(data.product && data.stockInfo),
+  purchase_push: data => Boolean(data.product)
+};
+
+const firstString = (...values) => values.find(value => typeof value === 'string' && value.trim()) || null;
+
+const firstDefined = (...values) => values.find(value => value !== undefined && value !== null && value !== '');
+
+const extractProductSpecsFromText = product => {
+  const text = [product.reason, product.description, product.details, product.note]
+    .filter(value => typeof value === 'string')
+    .join('；');
+  if (!text) return {};
+  const dpi = text.match(/(\d{3,6}(?:\s*[-~至]\s*\d{3,6})?)\s*DPI/i)?.[1];
+  const pollingRate = text.match(/(\d{3,4})\s*Hz/i)?.[1];
+  const weight = text.match(/(?:重量|轻量化?|约|仅)?\s*(\d+(?:\.\d+)?)\s*(g|克)\b/i);
+  const battery = text.match(/续航(?:时间)?(?:可达|达到|达|约|为|[:：])?\s*(\d+(?:\.\d+)?\s*(?:个月|月|小时|h|天))/i)?.[1];
+  const connection = text.match(/((?:2\.4G|蓝牙(?:\s*\d(?:\.\d)?)?|有线)(?:\s*[+、/]\s*(?:2\.4G|蓝牙(?:\s*\d(?:\.\d)?)?|有线)){0,2}(?:双模|三模)?)/i)?.[1];
+  const sensor = text.match(/((?:PixArt\s*)?PAW\d{4}[A-Za-z]*|原相\s*[A-Za-z0-9-]+(?:传感器)?)/i)?.[1];
+  return {
+    ...(sensor ? { sensor } : {}),
+    ...(dpi ? { dpi: `${dpi.replace(/\s+/g, '')} DPI` } : {}),
+    ...(weight ? { weight: `${weight[1]}${weight[2]}` } : {}),
+    ...(pollingRate ? { pollingRate: `${pollingRate} Hz` } : {}),
+    ...(connection ? { connection: connection.replace(/\s+/g, '') } : {}),
+    ...(battery ? { battery: battery.replace(/\s+/g, '') } : {})
+  };
+};
+
+export const normalizeKnowledgeProduct = product => {
+  const extracted = extractProductSpecsFromText(product);
+  return {
+    ...product,
+    sensor: firstDefined(product.sensor, product.sensorModel, product.sensor_model, product['传感器'], extracted.sensor),
+    dpi: firstDefined(product.dpi, product.dpiRange, product.dpi_range, product.DPI, product['DPI'], extracted.dpi),
+    weight: firstDefined(product.weight, product.weightGrams, product.weight_grams, product['重量'], extracted.weight),
+    pollingRate: firstDefined(product.pollingRate, product.polling_rate, product.polling_rate_hz, product['回报率'], extracted.pollingRate),
+    connection: firstDefined(product.connection, product.connectionType, product.connection_type, product.connectivity, product['连接方式'], extracted.connection),
+    battery: firstDefined(product.battery, product.batteryLife, product.battery_life, product['续航'], extracted.battery),
+    scenario: firstDefined(product.scenario, product.useCase, product.use_case, product['适用场景']),
+    target: firstDefined(product.target, product.targetUser, product.target_user, product['目标用户'], product.scenario)
+  };
+};
+
+const normalizeProduct = item => {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+  const nested = item.product || item.sku || item.item;
+  if (!nested || typeof nested !== 'object' || Array.isArray(nested)) return normalizeKnowledgeProduct(item);
+  return normalizeKnowledgeProduct({
+    ...nested,
+    ...(item.reason && !nested.reason ? { reason: item.reason } : {}),
+    ...(item.matchReasons && !nested.matchReasons ? { matchReasons: item.matchReasons } : {})
+  });
+};
+
+const parseNestedJson = value => {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return value;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return value;
   }
-  const content = await requestChatCompletion(config, [
-    { role: 'system', content: '你是API连通性测试助手。' },
-    { role: 'user', content: '请只回复：连接成功' }
-  ]);
+};
+
+const normalizeIntentData = ({ parsed, response, intent, rawData }) => {
+  const normalizedRawData = parseNestedJson(rawData);
+  const objectData = normalizedRawData && typeof normalizedRawData === 'object' && !Array.isArray(normalizedRawData)
+    ? normalizedRawData
+    : {};
+  if (intent !== 'product_recommendation') return objectData;
+
+  const nestedRecommendation = objectData.product_recommendation
+    || objectData.recommendation
+    || objectData.result
+    || objectData.payload
+    || {};
+  const productArrays = [
+    Array.isArray(normalizedRawData) ? normalizedRawData : null,
+    objectData.products,
+    objectData.recommendations,
+    objectData.product_list,
+    objectData.productList,
+    objectData.items,
+    nestedRecommendation.products,
+    nestedRecommendation.recommendations,
+    nestedRecommendation.product_list,
+    nestedRecommendation.productList,
+    nestedRecommendation.items,
+    response.products,
+    response.recommendations,
+    response.product_list,
+    response.productList,
+    parsed.products,
+    parsed.recommendations,
+    parsed.product_list,
+    parsed.productList
+  ];
+  const products = productArrays
+    .find(Array.isArray)
+    ?.map(normalizeProduct)
+    .filter(Boolean) || [];
+
+  return products.length ? { ...objectData, products } : objectData;
+};
+
+export const parseKnowledgeResponse = rawContent => {
+  let parsed;
+  try {
+    parsed = JSON.parse(stripJsonFence(rawContent));
+  } catch {
+    throw new Error('知识库返回格式异常，请在百炼提示词中确保只输出合法JSON');
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('知识库返回格式异常：顶层必须是JSON对象');
+  }
+  const response = parsed.response && typeof parsed.response === 'object' && !Array.isArray(parsed.response)
+    ? parsed.response
+    : parsed;
+  let intent = response.intent || parsed.intent || null;
+  let type = response.type || response.response_type || (intent ? 'intent' : 'text');
+  if (!intent && INTENT_DATA_CHECKS[type]) {
+    intent = type;
+    type = 'intent';
+  }
+  const rawData = response.data ?? parsed.data ?? null;
+  const data = normalizeIntentData({ parsed, response, intent, rawData });
+  const sourceData = rawData && typeof rawData === 'object' && !Array.isArray(rawData) ? rawData : {};
+  const content = firstString(
+    response.content,
+    response.answer,
+    response.message,
+    response.text,
+    response.reply,
+    parsed.content,
+    parsed.answer,
+    parsed.message,
+    parsed.text,
+    parsed.reply,
+    sourceData.content,
+    sourceData.answer,
+    sourceData.message,
+    sourceData.text,
+    sourceData.reply
+  );
+  if (type === 'intent' && INTENT_DATA_CHECKS[intent] && !INTENT_DATA_CHECKS[intent](data)) {
+    if (content) type = 'text';
+    else throw new Error(`知识库JSON缺少${intent}界面所需的结构化data`);
+  }
+  if (type === 'text' && typeof content !== 'string') {
+    throw new Error('知识库JSON缺少可显示的content字段');
+  }
+  const analysis = parsed.analysis || response.analysis || null;
+  const criteriaUpdates = parsed.criteria_updates || parsed.criteriaUpdates || response.criteria_updates || response.criteriaUpdates || {};
+  const criteriaReset = Boolean(parsed.criteria_reset ?? parsed.criteriaReset ?? response.criteria_reset ?? response.criteriaReset);
+  const quote = parsed.quote || response.quote || data.quote || null;
+  return {
+    type,
+    ...(intent && type === 'intent' ? { intent, data } : { content }),
+    source: 'knowledge-base',
+    analysis,
+    criteriaUpdates,
+    criteriaReset,
+    quote
+  };
+};
+
+const buildKnowledgePrompt = message => `
+只能依据阿里云百炼应用已绑定的知识库内容和应用提示词回答。不得使用会话历史中的助手回复作为商品事实，不得根据常识补写知识库中没有的参数、价格、库存、优惠、规则或联系方式。知识库没有依据时必须明确无法确认。
+
+只输出一个合法JSON对象，不要输出Markdown、代码围栏或JSON之外的文字。固定结构：
+{
+  "schema_version": "xg-knowledge-response-v1",
+  "type": "text或intent",
+  "intent": "可选；selection_consultation、product_recommendation、product_comparison、parameter_query、compatibility_check、price_inquiry、bargain、stock_logistics、enterprise_purchase、purchase_push、after_sales、complaint、direct_human、casual_chat、security_warning",
+  "content": "type为text时必填，所有事实必须来自知识库",
+  "data": {},
+  "analysis": {"primary_intent":"意图", "secondary_intents":[], "confidence":0, "entities":{}, "sentiment":"中性", "risk_flags":[], "next_action":"动作"},
+  "criteria_updates": {},
+  "criteria_reset": false,
+  "quote": null
+}
+
+当intent为product_recommendation时，data必须严格使用以下对象结构，products必须是JSON数组，不要改名为recommendations或product_list，也不要把数组直接放在data中：
+"data": {
+  "products": [
+    { "id": "知识库商品ID", "name": "知识库商品名", "price": 0, "reason": "推荐理由" }
+  ],
+  "note": "可选补充说明"
+}
+products中的每个字段都必须来自知识库；知识库没有商品依据时，改用type=text并在content中说明无法确认，不得输出空的product_recommendation。
+每个products商品对象必须尽量把知识库中已有的传感器、DPI、重量、回报率、连接方式和续航分别写入sensor、dpi、weight、pollingRate、connection、battery字段。不要只把这些参数写进reason；知识库确实没有的字段填null，禁止猜测。
+
+结构化商品对象的字段按知识库实际内容填写，可用字段包括：id、name、tier、scenario、sensor、dpi、ips、acceleration、pollingRate、weight、connection、battery、switchLife、platform、warranty、price、promotionFloor、stock、stockStatus、reason、target、matchReasons。不得从本地或历史回答补齐缺失字段。
+
+当前用户问题：${message}`.trim();
+
+export const testApiConnection = async config => {
+  const content = await requestBailianApplication(config, '请简短回复：知识库应用连接成功');
+  resetKnowledgeSession();
   return content;
 };
 
-/**
- * 获取当前会话ID
- */
 export const getSessionId = () => {
   let sessionId = localStorage.getItem('chat_session_id');
   if (!sessionId) {
-    sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     localStorage.setItem('chat_session_id', sessionId);
   }
   return sessionId;
 };
 
-/**
- * 获取历史会话列表
- */
 export const getHistorySessions = () => {
   try {
     const sessions = JSON.parse(localStorage.getItem('chat_sessions') || '[]');
     const cutoff = Date.now() - SESSION_TTL_MS;
     const active = sessions.filter(session => new Date(session.updatedAt || 0).getTime() >= cutoff);
-    if (active.length !== sessions.length) {
-      localStorage.setItem('chat_sessions', JSON.stringify(active));
-    }
+    if (active.length !== sessions.length) localStorage.setItem('chat_sessions', JSON.stringify(active));
     return active;
   } catch {
     return [];
   }
 };
 
-/**
- * 保存会话
- */
-export const saveSession = (session) => {
+export const saveSession = session => {
   const sessions = getHistorySessions();
   const normalized = { ...session, updatedAt: session.updatedAt || new Date().toISOString() };
   const updatedSessions = [normalized, ...sessions.filter(item => item.id !== session.id)].slice(0, 50);
@@ -284,12 +421,8 @@ export const saveSession = (session) => {
   return updatedSessions;
 };
 
-/**
- * 删除会话
- */
-export const deleteSession = (sessionId) => {
-  const sessions = getHistorySessions();
-  const updatedSessions = sessions.filter(s => s.id !== sessionId);
+export const deleteSession = sessionId => {
+  const updatedSessions = getHistorySessions().filter(session => session.id !== sessionId);
   localStorage.setItem('chat_sessions', JSON.stringify(updatedSessions));
   sessionStorage.removeItem(`${BAILIAN_SESSION_KEY}:${sessionId}`);
   return updatedSessions;
@@ -305,311 +438,25 @@ export const clearHistorySessions = () => {
 
 export const sendMessageToAI = async (message, conversationHistory, currentCriteria) => {
   const config = getApiConfig();
-  const routed = routeSalesMessage({
-    message,
-    currentCriteria: currentCriteria || {},
-    skus: getSkus(),
-    faqs: getFaqs()
-  });
-  let bailianParamsPromise;
-  const getBailianParams = () => {
-    bailianParamsPromise ||= loadBailianUserPromptParams({
-      message,
-      conversationHistory,
-      currentCriteria
-    });
-    return bailianParamsPromise;
-  };
-
-  if (routed.useKnowledgeBase && config.mode === 'bailian-app' && config.appId && config.apiKey) {
-    const content = await requestBailianApplication(
-      config,
-      `请仅依据已绑定的知识库和已授权的客户上下文回答；没有依据时明确说明无法确认，并保留引用来源。\n用户问题：${message}`,
-      await getBailianParams()
-    );
-    return {
-      ...routed.response,
-      data: { ...routed.response.data, answer: content },
-      source: 'knowledge-base',
-      analysis: routed.analysis,
-      criteriaUpdates: routed.criteriaUpdates
-    };
-  }
-
-  if (
-    routed.analysis.primary_intent === 'casual_chat' &&
-    config.mode === 'bailian-app' &&
-    config.appId && config.apiKey
-  ) {
-    const content = await requestBailianApplication(
-      config,
-      `请优先依据已绑定知识库和已授权的客户上下文回答与L1系列相关的问题；无关问题简短回应并引导回产品咨询。\n用户问题：${message}`,
-      await getBailianParams()
-    );
+  if (!config.appId || !config.apiKey) {
     return {
       type: 'text',
-      content,
-      source: 'knowledge-base',
-      analysis: routed.analysis,
-      criteriaUpdates: routed.criteriaUpdates
+      content: KNOWLEDGE_UNAVAILABLE_MESSAGE,
+      source: 'system',
+      analysis: null,
+      criteriaUpdates: {}
     };
   }
-
-  if (
-    routed.analysis.primary_intent === 'casual_chat' &&
-    config.mode === 'openai-compatible' &&
-    config.endpoint && config.model && config.apiKey
-  ) {
-    const history = conversationHistory
-      .filter(item => item.content && (item.type === 'user' || item.type === 'ai'))
-      .slice(-12)
-      .map(item => ({
-        role: item.type === 'user' ? 'user' : 'assistant',
-        content: item.content
-      }));
-    const criteriaText = Object.keys(currentCriteria || {}).length
-      ? `\n当前已确认的选购条件：${JSON.stringify(currentCriteria)}`
-      : '';
-    const content = await requestChatCompletion(config, [
-      { role: 'system', content: `${SYSTEM_PROMPT}${criteriaText}` },
-      ...history,
-      { role: 'user', content: message }
-    ]);
-    return {
-      type: 'text',
-      content,
-      source: 'api',
-      analysis: routed.analysis,
-      criteriaUpdates: routed.criteriaUpdates
-    };
-  }
-
-  return {
-    ...routed.response,
-    source: routed.useKnowledgeBase ? 'local-knowledge' : 'rule-engine',
-    analysis: routed.analysis,
-    criteriaUpdates: routed.criteriaUpdates,
-    criteriaReset: routed.criteriaReset,
-    quote: routed.quote
-  };
+  const rawContent = await requestBailianApplication(
+    config,
+    buildKnowledgePrompt(message),
+    await loadBailianUserPromptParams({ message, conversationHistory, currentCriteria })
+  );
+  return parseKnowledgeResponse(rawContent);
 };
 
-/**
- * 生成Mock响应
- */
-const _generateMockResponse = (message, criteria) => {
-  const lowerMessage = message.toLowerCase();
-  
-  // 处理各种意图
-  if (lowerMessage.includes('转人工') || lowerMessage.includes('人工')) {
-    return {
-      type: 'intent',
-      intent: 'direct_human',
-      data: {}
-    };
-  }
-  
-  if (lowerMessage.includes('投诉') || lowerMessage.includes('不好') || lowerMessage.includes('差评')) {
-    return {
-      type: 'intent',
-      intent: 'complaint',
-      data: {}
-    };
-  }
-  
-  if (lowerMessage.includes('售后') || lowerMessage.includes('退换') || lowerMessage.includes('保修')) {
-    return {
-      type: 'intent',
-      intent: 'after_sales',
-      data: {}
-    };
-  }
-  
-  if (lowerMessage.includes('价格') || lowerMessage.includes('多少钱') || lowerMessage.includes('报价')) {
-    const matchingProduct = findMatchingProduct(criteria);
-    return {
-      type: 'intent',
-      intent: 'price_inquiry',
-      data: {
-        product: matchingProduct,
-        priceType: 'open'
-      }
-    };
-  }
-  
-  if (lowerMessage.includes('库存') || lowerMessage.includes('现货') || lowerMessage.includes('发货')) {
-    const matchingProduct = findMatchingProduct(criteria);
-    return {
-      type: 'intent',
-      intent: 'stock_logistics',
-      data: {
-        product: matchingProduct,
-        stockInfo: {
-          available: matchingProduct?.stock > 0,
-          count: matchingProduct?.stock || 0,
-          warehouse: '华东仓（上海）'
-        },
-        estimatedDelivery: '2-3天'
-      }
-    };
-  }
-  
-  if (lowerMessage.includes('dpi') || lowerMessage.includes('参数') || lowerMessage.includes('微动')) {
-    return {
-      type: 'intent',
-      intent: 'parameter_query',
-      data: {
-        question: message,
-        answer: 'DPI是鼠标灵敏度的单位，数值越大移动的像素越多。办公使用建议800-1600 DPI，游戏使用建议4000以上。DPI可调范围越大，鼠标适用场景越广。',
-        relatedProduct: mockSkus.find(s => s.tier === '进阶')
-      }
-    };
-  }
-  
-  if (lowerMessage.includes('兼容') || lowerMessage.includes('mac') || lowerMessage.includes('支持') || lowerMessage.includes('连接')) {
-    const matchingProduct = findMatchingProduct(criteria);
-    const deviceType = lowerMessage.includes('mac') ? 'Mac系统' : '您的设备';
-    return {
-      type: 'intent',
-      intent: 'compatibility_check',
-      data: {
-        status: 'compatible',
-        deviceType,
-        product: matchingProduct || mockSkus[0]
-      }
-    };
-  }
-  
-  if (lowerMessage.includes('便宜') || lowerMessage.includes('优惠') || lowerMessage.includes('打折')) {
-    return {
-      type: 'intent',
-      intent: 'bargain',
-      data: {
-        message: '理解您的想法，目前这款已经是活动价了，不过我们可以赠送一个鼠标垫作为赠品，您看可以吗？',
-        isApproving: false
-      }
-    };
-  }
-  
-  if (lowerMessage.includes('便宜点') || lowerMessage.includes('最低价') || lowerMessage.includes('最低多少钱')) {
-    return {
-      type: 'intent',
-      intent: 'bargain',
-      data: {
-        message: '非常抱歉，我暂时没有直接降价的权限，需要联系销售顾问为您申请。',
-        isApproving: false
-      }
-    };
-  }
-  
-  if (lowerMessage.includes('企业') || lowerMessage.includes('批发') || lowerMessage.includes('批量') || lowerMessage.includes('公司采购')) {
-    return {
-      type: 'intent',
-      intent: 'enterprise_purchase',
-      data: {}
-    };
-  }
-  
-  if (lowerMessage.includes('买') || lowerMessage.includes('下单') || lowerMessage.includes('购买') || lowerMessage.includes('要了')) {
-    const matchingProduct = findMatchingProduct(criteria);
-    return {
-      type: 'intent',
-      intent: 'purchase_push',
-      data: {
-        product: matchingProduct || mockSkus[1]
-      }
-    };
-  }
-  
-  if (lowerMessage.includes('比较') || lowerMessage.includes('对比') || lowerMessage.includes('哪个好')) {
-    return {
-      type: 'intent',
-      intent: 'product_comparison',
-      data: {
-        productA: mockSkus[0],
-        productB: mockSkus[1]
-      }
-    };
-  }
-  
-  if (lowerMessage.includes('办公') || lowerMessage.includes('游戏') || lowerMessage.includes('便携') || 
-      lowerMessage.includes('设计') || lowerMessage.includes('推荐') || lowerMessage.includes('选购')) {
-    // 根据场景推荐商品
-    const scene = lowerMessage.includes('办公') ? '办公' : 
-                 lowerMessage.includes('游戏') ? '游戏' :
-                 lowerMessage.includes('设计') ? '设计' :
-                 lowerMessage.includes('便携') ? '办公' : '';
-    
-    const products = scene ? mockSkus.filter(s => s.scenario === scene).slice(0, 3) : mockSkus.slice(0, 3);
-    
-    // 如果没有匹配的，返回全部
-    const finalProducts = products.length > 0 ? products : mockSkus.slice(0, 3);
-    
-    return {
-      type: 'intent',
-      intent: 'product_recommendation',
-      data: {
-        products: finalProducts
-      }
-    };
-  }
-  
-  if (lowerMessage.includes('你好') || lowerMessage.includes('hi') || lowerMessage.includes('hello')) {
-    return {
-      type: 'text',
-      content: '您好！我是AI鼠标选购顾问。请问您主要用鼠标做什么？我可以根据用途和预算帮您推荐。'
-    };
-  }
-  
-  // 默认返回选购咨询引导
-  return {
-    type: 'intent',
-    intent: 'selection_consultation',
-    data: {}
-  };
-};
-
-/**
- * 根据当前条件查找匹配商品
- */
-const findMatchingProduct = (criteria) => {
-  if (!criteria || Object.keys(criteria).length === 0) {
-    return mockSkus[1]; // 默认返回进阶款
-  }
-  
-  let filteredProducts = [...mockSkus];
-  
-  if (criteria.scene) {
-    filteredProducts = filteredProducts.filter(p => 
-      p.scenario.includes(criteria.scene)
-    );
-  }
-  
-  if (criteria.budget) {
-    const budgetMatch = {
-      '150元内': p => p.price < 150,
-      '150~400元': p => p.price >= 150 && p.price <= 400,
-      '400元以上': p => p.price > 400
-    };
-    const matcher = budgetMatch[criteria.budget];
-    if (matcher) {
-      filteredProducts = filteredProducts.filter(matcher);
-    }
-  }
-  
-  return filteredProducts[0] || mockSkus[1];
-};
-
-/**
- * 获取当前会话状态（Mock）
- */
-export const getSessionStatus = async () => {
-  return {
-    sessionId: getSessionId(),
-    status: 'active',
-    createdAt: new Date().toISOString()
-  };
-};
-
-// 导出Mock数据供使用
-export { mockSkus, mockFaqs, mockScripts };
+export const getSessionStatus = async () => ({
+  sessionId: getSessionId(),
+  status: 'active',
+  createdAt: new Date().toISOString()
+});

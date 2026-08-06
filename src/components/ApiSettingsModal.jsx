@@ -30,19 +30,8 @@ const ApiSettingsModal = ({ isOpen, onClose, onConfigChange }) => {
 
   const validate = () => {
     if (!config.apiKey.trim()) return '请输入API Key';
-    if (config.mode === 'bailian-app') {
-      if (!config.appId.trim()) return '请输入百炼应用ID（APP_ID）';
-      if (!/^[A-Za-z0-9_-]+$/.test(config.appId.trim())) return '应用ID格式不正确';
-      return '';
-    }
-    if (!config.endpoint.trim()) return '请输入API接口地址';
-    try {
-      const url = new URL(config.endpoint.trim());
-      if (!['https:', 'http:'].includes(url.protocol)) return '接口地址必须使用HTTP或HTTPS';
-    } catch {
-      return 'API接口地址格式不正确';
-    }
-    if (!config.model.trim()) return '请输入模型名称';
+    if (!config.appId.trim()) return '请输入百炼应用ID（APP_ID）';
+    if (!/^[A-Za-z0-9_-]+$/.test(config.appId.trim())) return '应用ID格式不正确';
     return '';
   };
 
@@ -56,9 +45,7 @@ const ApiSettingsModal = ({ isOpen, onClose, onConfigChange }) => {
     onConfigChange(true);
     setStatus({
       type: 'success',
-      message: config.mode === 'bailian-app'
-        ? '配置已保存，参数知识问答将调用百炼知识库应用'
-        : '配置已保存，闲聊将调用通用模型；商品与报价仍由本地规则引擎处理'
+      message: '配置已保存，所有业务回答将调用百炼知识库应用'
     });
   };
 
@@ -86,7 +73,7 @@ const ApiSettingsModal = ({ isOpen, onClose, onConfigChange }) => {
     clearApiConfig();
     setConfig(DEFAULT_API_CONFIG);
     onConfigChange(false);
-    setStatus({ type: 'success', message: 'API配置已清除，聊天将使用模拟数据' });
+    setStatus({ type: 'success', message: 'API配置已清除，未连接时不会返回商品知识' });
   };
 
   return (
@@ -108,66 +95,19 @@ const ApiSettingsModal = ({ isOpen, onClose, onConfigChange }) => {
         </div>
 
         <div className="space-y-5 px-6 py-5">
-          <div className="grid grid-cols-2 gap-2 rounded-xl bg-gray-100 p-1">
-            <button
-              type="button"
-              onClick={() => updateField('mode', 'bailian-app')}
-              className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-                config.mode === 'bailian-app' ? 'bg-white text-primary shadow-sm' : 'text-gray-500'
-              }`}
-            >
-              百炼知识库应用
-              <span className="ml-1 text-[10px] text-emerald-600">推荐</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => updateField('mode', 'openai-compatible')}
-              className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-                config.mode === 'openai-compatible' ? 'bg-white text-primary shadow-sm' : 'text-gray-500'
-              }`}
-            >
-              通用模型接口
-            </button>
-          </div>
-
-          {config.mode === 'bailian-app' ? (
-            <>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">百炼应用ID（APP_ID）</span>
-                <input
-                  value={config.appId}
-                  onChange={event => updateField('appId', event.target.value)}
-                  placeholder="应用发布后，在应用调用页面复制APP_ID"
-                  autoComplete="off"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                />
-                <span className="mt-1.5 block text-xs leading-5 text-gray-500">
-                  这里填写绑定了“AI销售助手”知识库的应用ID，不是知识库名称或模型名称。
-                </span>
-              </label>
-            </>
-          ) : (
-            <>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">API接口地址</span>
-                <input
-                  value={config.endpoint}
-                  onChange={event => updateField('endpoint', event.target.value)}
-                  placeholder="https://.../v1/chat/completions"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">模型名称</span>
-                <input
-                  value={config.model}
-                  onChange={event => updateField('model', event.target.value)}
-                  placeholder="例如：qwen-plus"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                />
-              </label>
-            </>
-          )}
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-gray-700">百炼应用ID（APP_ID）</span>
+            <input
+              value={config.appId}
+              onChange={event => updateField('appId', event.target.value)}
+              placeholder="应用发布后，在应用调用页面复制APP_ID"
+              autoComplete="off"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+            />
+            <span className="mt-1.5 block text-xs leading-5 text-gray-500">
+              这里填写已绑定并发布知识库的百炼应用ID。
+            </span>
+          </label>
 
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-gray-700">API Key</span>
@@ -192,9 +132,7 @@ const ApiSettingsModal = ({ isOpen, onClose, onConfigChange }) => {
           </label>
 
           <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-800">
-            {config.mode === 'bailian-app'
-              ? '回答会通过APP_ID调用百炼应用，并使用该应用已绑定的知识库。请先在百炼控制台发布应用。'
-              : '通用模型接口不会自动读取百炼知识库，仅适合普通模型问答。'}
+            所有业务回答只通过APP_ID调用百炼应用，并使用该应用绑定的知识库与提示词。未连接时不会使用本地商品数据兜底。
           </div>
 
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">

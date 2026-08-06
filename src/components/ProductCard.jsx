@@ -1,5 +1,6 @@
 import React from 'react';
 import { Zap } from 'lucide-react';
+import { normalizeKnowledgeProduct } from '../services/api';
 
 /**
  * 商品推荐卡片组件
@@ -7,6 +8,7 @@ import { Zap } from 'lucide-react';
  * 展示单款鼠标的核心信息和操作按钮
  */
 const ProductCard = ({ product }) => {
+  const displayProduct = normalizeKnowledgeProduct(product);
   // 档位颜色映射
   const tierColors = {
     '入门': 'bg-green-100 text-green-700',
@@ -16,29 +18,29 @@ const ProductCard = ({ product }) => {
     'Pro版': 'bg-purple-100 text-purple-700'
   };
   const specs = [
-    ['传感器', product.sensor],
-    ['DPI', product.dpi],
-    ['重量', product.weight],
-    ['回报率', product.pollingRate],
-    ['连接方式', product.connection],
-    ['续航', product.battery]
+    ['传感器', displayProduct.sensor],
+    ['DPI', displayProduct.dpi],
+    ['重量', displayProduct.weight],
+    ['回报率', displayProduct.pollingRate],
+    ['连接方式', displayProduct.connection],
+    ['续航', displayProduct.battery]
   ];
 
   return (
-    <div className="neon-border h-full w-full rounded-2xl bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-neon-purple">
+    <div className="neon-border h-full w-full cursor-default rounded-2xl bg-white p-4 shadow-sm">
       <div className="space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 pb-3">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-semibold text-gray-800">{product.name}</h3>
-              <span className={`rounded px-2 py-0.5 text-xs font-medium ${tierColors[product.tier] || 'bg-gray-100 text-gray-700'}`}>
-                {product.tier}
+              <h3 className="text-base font-semibold text-gray-800">{displayProduct.name}</h3>
+              <span className={`rounded px-2 py-0.5 text-xs font-medium ${tierColors[displayProduct.tier] || 'bg-gray-100 text-gray-700'}`}>
+                {displayProduct.tier}
               </span>
             </div>
-            <p className="mt-1 text-xs text-gray-500">{product.scenario}</p>
+            <p className="mt-1 text-xs text-gray-500">{displayProduct.scenario}</p>
           </div>
           <div className="text-right">
-            <div className="text-xl font-bold text-primary">¥{product.price}</div>
+            <div className="text-xl font-bold text-primary">¥{displayProduct.price}</div>
             <div className="text-[10px] text-gray-400">公开零售价</div>
           </div>
         </div>
@@ -47,21 +49,21 @@ const ProductCard = ({ product }) => {
           {specs.map(([label, value]) => (
             <div key={label} className="min-w-0">
               <div className="text-gray-400">{label}</div>
-              <div className="mt-0.5 break-words font-medium leading-5 text-gray-700">{value || '暂无数据'}</div>
+              <div className="mt-0.5 break-words font-medium leading-5 text-gray-700">{value || '知识库未提供'}</div>
             </div>
           ))}
         </div>
 
         <div className="rounded-xl bg-gray-50 p-3">
           <p className="text-xs leading-5 text-gray-600">
-            <span className="text-gray-400">推荐理由：</span>{product.reason}
+            <span className="text-gray-400">推荐理由：</span>{displayProduct.reason}
           </p>
           <p className="mt-1 text-xs leading-5 text-gray-500">
-            <span className="text-gray-400">适用场景：</span>{product.target}
+            <span className="text-gray-400">适用场景：</span>{displayProduct.target || '知识库未提供'}
           </p>
-          {product.matchReasons?.length > 0 && (
+          {displayProduct.matchReasons?.length > 0 && (
             <div className="mt-2 border-t border-gray-200 pt-2 text-xs leading-5 text-emerald-700">
-              {product.matchReasons.map(item => <p key={item}>✓ {item}</p>)}
+              {displayProduct.matchReasons.map(item => <p key={item}>✓ {item}</p>)}
             </div>
           )}
         </div>
