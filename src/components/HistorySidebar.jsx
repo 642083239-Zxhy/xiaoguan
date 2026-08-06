@@ -11,6 +11,7 @@ const HistorySidebar = ({
   sessions, 
   onSelectSession, 
   onDeleteSession,
+  onClearHistory,
   onNewSession 
 }) => {
   if (!isOpen) return null;
@@ -91,8 +92,13 @@ const HistorySidebar = ({
         </div>
         
         {/* 底部提示 */}
-        <div className="p-3 border-t border-gray-100 text-xs text-gray-400 text-center">
-          匿名用户仅显示最近7天记录
+        <div className="space-y-2 border-t border-gray-100 p-3 text-center text-xs text-gray-400">
+          <p>匿名记录仅保留7天，数据保存在当前浏览器</p>
+          {sessions.length > 0 && (
+            <button onClick={onClearHistory} className="text-red-400 transition hover:text-red-300">
+              清空全部历史记录
+            </button>
+          )}
         </div>
       </div>
     </div>

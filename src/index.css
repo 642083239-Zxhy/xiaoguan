@@ -8,7 +8,9 @@
 
 body {
   margin: 0;
-  background-color: #f9fafb;
+  background-color: #08090f;
+  color: #e5e7eb;
+  overflow-x: hidden;
 }
 
 #root {
@@ -73,4 +75,116 @@ body {
 
 .loading-dot {
   animation: bounce-dot 1.4s infinite ease-in-out both;
+}
+
+/* 雷龙品牌主题：吸收远程 thunder-dragon-ui 分支的紫青霓虹语言 */
+.thunder-theme {
+  color: #e5e7eb;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% -15%, rgba(124, 58, 237, 0.24), transparent),
+    radial-gradient(ellipse 55% 45% at 90% 80%, rgba(0, 212, 255, 0.10), transparent),
+    linear-gradient(180deg, #08090f 0%, #0b0c14 52%, #08090f 100%);
+}
+
+.cyber-grid-bg {
+  background-image:
+    linear-gradient(rgba(139, 92, 246, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.glass-dark {
+  background: linear-gradient(135deg, rgba(19, 17, 32, 0.94), rgba(8, 10, 18, 0.96));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-color: rgba(139, 92, 246, 0.22);
+}
+
+.text-gradient-dragon {
+  background: linear-gradient(135deg, #00d4ff 0%, #c084fc 55%, #f000ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.neon-border {
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  box-shadow: 0 0 18px rgba(124, 58, 237, 0.10), inset 0 0 20px rgba(0, 212, 255, 0.025);
+}
+
+.cyber-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.cyber-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-110%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.14), transparent);
+  transition: transform .6s ease;
+}
+
+.cyber-btn:hover::before {
+  transform: translateX(110%);
+}
+
+.dragon-orb {
+  position: fixed;
+  width: 28rem;
+  height: 28rem;
+  border-radius: 9999px;
+  filter: blur(90px);
+  pointer-events: none;
+  opacity: .16;
+}
+
+.dragon-orb-left {
+  left: -12rem;
+  bottom: -12rem;
+  background: #00d4ff;
+}
+
+.dragon-orb-right {
+  right: -12rem;
+  top: -12rem;
+  background: #a855f7;
+}
+
+.thunder-theme .bg-white { background-color: rgba(15, 17, 28, .96); }
+.thunder-theme .bg-gray-50 { background-color: rgba(12, 14, 24, .92); }
+.thunder-theme .bg-gray-100 { background-color: rgba(28, 31, 48, .92); }
+.thunder-theme .bg-gray-200 { background-color: #292d43; }
+.thunder-theme .border-gray-100 { border-color: rgba(139, 92, 246, .14); }
+.thunder-theme .border-gray-200 { border-color: #292d43; }
+.thunder-theme .border-gray-300 { border-color: #3a3f5c; }
+.thunder-theme .text-gray-900,
+.thunder-theme .text-gray-800 { color: #f3f4f6; }
+.thunder-theme .text-gray-700 { color: #d1d5db; }
+.thunder-theme .text-gray-600 { color: #aeb4c2; }
+.thunder-theme .text-gray-500 { color: #8b93a7; }
+.thunder-theme .text-gray-400 { color: #687086; }
+.thunder-theme .hover\:bg-gray-100:hover { background-color: rgba(46, 50, 74, .9); }
+.thunder-theme .hover\:bg-gray-200:hover { background-color: rgba(56, 61, 88, .95); }
+.thunder-theme input,
+.thunder-theme textarea,
+.thunder-theme select {
+  color: #e5e7eb;
+  background-color: rgba(9, 11, 19, .82);
+}
+.thunder-theme input::placeholder,
+.thunder-theme textarea::placeholder { color: #596176; }
+
+.thunder-theme ::-webkit-scrollbar-track { background: #0a0c14; }
+.thunder-theme ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(0,212,255,.55), rgba(168,85,247,.55));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-enter,
+  .loading-dot,
+  .animate-pulse {
+    animation: none !important;
+  }
 }

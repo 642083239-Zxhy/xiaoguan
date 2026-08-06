@@ -1,19 +1,28 @@
 import React, { useState } from 'react';
 import { X, Package, HelpCircle, MessageSquare, Database, Plus, Trash2, Edit2, Save } from 'lucide-react';
-import { mockSkus, mockFaqs, mockScripts } from '../data/mockData';
+import {
+  getAnalytics,
+  getFaqs,
+  getScripts,
+  getSkus,
+  saveFaqs,
+  saveScripts,
+  saveSkus
+} from '../services/dataStore';
 
 /**
  * 后台配置页面组件
  * 包含SKU管理、FAQ管理、话术配置、知识库更新四个标签页
  */
-const AdminPanel = ({ isOpen, onClose }) => {
+const AdminPanel = ({ isOpen, onClose, onDataChange }) => {
   const [activeTab, setActiveTab] = useState('sku');
-  const [skus, setSkus] = useState(mockSkus);
-  const [faqs, setFaqs] = useState(mockFaqs);
-  const [scripts, setScripts] = useState(mockScripts);
+  const [skus, setSkus] = useState(() => getSkus());
+  const [faqs, setFaqs] = useState(() => getFaqs());
+  const [scripts, setScripts] = useState(() => getScripts());
   const [editingItem, setEditingItem] = useState(null);
 
   if (!isOpen) return null;
+  const analytics = getAnalytics();
 
   const tabs = [
     { id: 'sku', name: 'SKU管理', icon: Package },
@@ -44,37 +53,44 @@ const AdminPanel = ({ isOpen, onClose }) => {
 
   // 保存SKU
   const handleSaveSku = (sku) => {
-    if (sku.id) {
-      setSkus(skus.map(s => s.id === sku.id ? sku : s));
-    } else {
-      setSkus([...skus, { ...sku, id: `SKU${Date.now()}` }]);
-    }
+    if (!sku.name?.trim() || !sku.price) return;
+    const normalized = { ...sku, price: Number(sku.price), stock: sku.stock === '' ? null : Number(sku.stock) };
+    const next = sku.id
+      ? skus.map(item => item.id === sku.id ? normalized : item)
+      : [...skus, { ...normalized, id: `SKU${Date.now()}` }];
+    setSkus(saveSkus(next));
+    onDataChange?.();
     setEditingItem(null);
   };
 
   // 删除SKU
   const handleDeleteSku = (id) => {
-    setSkus(skus.filter(s => s.id !== id));
+    setSkus(saveSkus(skus.filter(item => item.id !== id)));
+    onDataChange?.();
   };
 
   // 保存FAQ
   const handleSaveFaq = (faq) => {
-    if (faq.id) {
-      setFaqs(faqs.map(f => f.id === faq.id ? faq : f));
-    } else {
-      setFaqs([...faqs, { ...faq, id: Date.now() }]);
-    }
+    if (!faq.question?.trim() || !faq.answer?.trim()) return;
+    const next = faq.id
+      ? faqs.map(item => item.id === faq.id ? faq : item)
+      : [...faqs, { ...faq, id: Date.now() }];
+    setFaqs(saveFaqs(next));
+    onDataChange?.();
     setEditingItem(null);
   };
 
   // 删除FAQ
   const handleDeleteFaq = (id) => {
-    setFaqs(faqs.filter(f => f.id !== id));
+    setFaqs(saveFaqs(faqs.filter(item => item.id !== id)));
+    onDataChange?.();
   };
 
   // 保存话术
   const handleSaveScript = (key, value) => {
-    setScripts({ ...scripts, [key]: value });
+    const next = { ...scripts, [key]: value };
+    setScripts(saveScripts(next));
+    onDataChange?.();
   };
 
   return (
@@ -103,7 +119,10 @@ const AdminPanel = ({ isOpen, onClose }) => {
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setEditingItem(null);
+              }}
               className={`flex items-center gap-2 px-4 py-3 text-sm transition-colors border-b-2 ${
                 activeTab === tab.id 
                   ? 'border-primary text-primary font-medium' 
@@ -221,7 +240,7 @@ const AdminPanel = ({ isOpen, onClose }) => {
               <div className="flex justify-between items-center mb-4">
                 <span className="text-sm text-gray-500">共 {faqs.length} 条FAQ</span>
                 <button
-                  onClick={() => setEditingItem({})}
+                  onClick={() => setEditingItem({ question: '', answer: '' })}
                   className="flex items-center gap-1 bg-primary text-white px-3 py-1.5 rounded-lg text-sm hover:bg-primary/90 transition-colors"
                 >
                   <Plus className="w-4 h-4" />
@@ -327,19 +346,14 @@ const AdminPanel = ({ isOpen, onClose }) => {
           {activeTab === 'knowledge' && (
             <div className="text-center py-12">
               <Database className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600 mb-2">知识库更新功能</p>
-              <p className="text-sm text-gray-400 mb-6">此功能将在API对接后启用，用于上传产品文档、FAQ等资料向量化入库</p>
-              <div className="max-w-sm mx-auto space-y-3">
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-primary transition-colors">
-                  <p className="text-sm text-gray-500">拖拽文件到此处或点击上传</p>
-                  <p className="text-xs text-gray-400 mt-1">支持PDF、Word、Excel格式</p>
-                </div>
-                <button className="bg-primary text-white px-4 py-2 rounded-lg text-sm hover:bg-primary/90 transition-colors">
-                  选择文件上传
-                </button>
+              <p className="text-gray-700 font-medium mb-2">知识库与数据状态</p>
+              <p className="text-sm text-gray-500 mb-6">文档上传与本地向量化属于本期不做范围，请在百炼控制台维护知识库；本页面负责调用已发布的知识库应用。</p>
+              <div className="max-w-sm mx-auto rounded-xl border border-blue-200 bg-blue-50 p-4 text-left text-sm text-blue-800">
+                <p className="font-medium">使用步骤</p>
+                <p className="mt-1 text-xs leading-5">先在百炼应用中绑定并发布知识库，再点击网页顶部钥匙图标，填写APP_ID和API Key。</p>
               </div>
               <div className="mt-8 text-left max-w-sm mx-auto">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">当前知识库内容</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">本地结构化数据</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">SKU数据</span>
@@ -353,6 +367,35 @@ const AdminPanel = ({ isOpen, onClose }) => {
                     <span className="text-gray-500">话术模板</span>
                     <span className="text-green-600">{Object.keys(scripts).length} 条</span>
                   </div>
+                  <div className="mt-3 border-t border-gray-100 pt-3 flex justify-between text-sm">
+                    <span className="text-gray-500">购买入口点击</span>
+                    <span className="text-primary">{analytics.purchaseClicks} 次</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">顾问入口点击</span>
+                    <span className="text-primary">{analytics.contactClicks} 次</span>
+                  </div>
+                  <div className="mt-3 border-t border-gray-100 pt-3 flex justify-between text-sm">
+                    <span className="text-gray-500">有效会话</span>
+                    <span className="text-gray-700">{analytics.sessionCount} 个</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">已转化会话</span>
+                    <span className="text-gray-700">{analytics.convertedSessionCount} 个</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">按钮转化率</span>
+                    <span className={analytics.conversionRate >= 5 ? 'text-green-600' : 'text-amber-600'}>
+                      {analytics.conversionRate}%
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    {analytics.sessionCount === 0
+                      ? '产生会话后开始统计5%验收指标。'
+                      : analytics.conversionRate >= 5
+                        ? '已达到转化率不低于5%的验收目标。'
+                        : '当前低于5%验收目标，可继续优化推荐与行动按钮。'}
+                  </p>
                 </div>
               </div>
             </div>

@@ -8,13 +8,15 @@ import { ProductCard } from './ProductCard';
  */
 
 // 1. 选购咨询 - 展示场景、预算快捷选项
-export const SelectionConsultation = ({ onSelectScene, onSelectBudget }) => {
+export const SelectionConsultation = ({ onSelectScene, onSelectBudget, onSelectDevice, missingFields = [] }) => {
   const scenes = ['办公', '游戏', '设计', '便携'];
-  const budgets = ['150元内', '150~400元', '400元以上'];
+  const budgets = ['400元内', '400~600元', '600元以上'];
   
   return (
     <div className="space-y-3">
-      <p className="text-sm text-gray-600 mb-2">请问您主要用鼠标做什么？预算大概多少？</p>
+      <p className="text-sm text-gray-600 mb-2">
+        {missingFields.length ? `还需要确认：${missingFields.join('、')}。` : '请补充使用场景、预算和设备系统。'}
+      </p>
       <div>
         <span className="text-xs text-gray-500 mb-2 block">使用场景：</span>
         <div className="flex gap-2 flex-wrap">
@@ -25,6 +27,20 @@ export const SelectionConsultation = ({ onSelectScene, onSelectBudget }) => {
               className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-sm text-gray-700 transition-colors"
             >
               {scene}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <span className="text-xs text-gray-500 mb-2 block">设备系统：</span>
+        <div className="flex gap-2 flex-wrap">
+          {['Windows', 'macOS'].map(device => (
+            <button
+              key={device}
+              onClick={() => onSelectDevice(device)}
+              className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-sm text-gray-700 transition-colors"
+            >
+              {device}
             </button>
           ))}
         </div>
@@ -48,15 +64,22 @@ export const SelectionConsultation = ({ onSelectScene, onSelectBudget }) => {
 };
 
 // 2. 商品推荐 - 展示三档商品名称
-export const ProductRecommendation = ({ products, onSelect }) => {
+export const ProductRecommendation = ({ products, note, onBuy, onHuman }) => {
   return (
-    <div className="space-y-2">
-      <p className="text-sm text-gray-600">我为您推荐以下几款鼠标：</p>
-      <div className="space-y-2">
+    <div className="space-y-3">
+      <p className="text-sm text-gray-600">根据当前条件，知识库中有以下匹配方案：</p>
+      {note && (
+        <p className="rounded-xl border border-purple-400/20 bg-purple-500/10 px-3 py-2 text-xs leading-5 text-purple-200">
+          {note}
+        </p>
+      )}
+      <div className="grid gap-3 md:grid-cols-2">
         {products.map((product, index) => (
           <div key={product.id}>
-            {index > 0 && <div className="text-gray-300 my-2 text-xs">或</div>}
-            <ProductCard product={product} onSelect={onSelect} />
+            <div className="mb-2 text-[10px] font-semibold tracking-wider text-purple-300">
+              {index === 0 ? '优先推荐' : '性能升级'}
+            </div>
+            <ProductCard product={product} onBuy={onBuy} onHuman={onHuman} />
           </div>
         ))}
       </div>
@@ -70,15 +93,17 @@ export const ProductComparison = ({ productA, productB }) => {
   
   const compareFields = [
     { key: 'tier', label: '档位' },
+    { key: 'sensor', label: '传感器' },
     { key: 'dpi', label: 'DPI' },
     { key: 'weight', label: '重量' },
+    { key: 'pollingRate', label: '回报率' },
     { key: 'connection', label: '连接方式' },
-    { key: 'price', label: '价格' },
-    { key: 'stock', label: '库存' }
+    { key: 'battery', label: '续航' },
+    { key: 'price', label: '公开零售价' }
   ];
   
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="neon-border overflow-hidden rounded-xl bg-white">
       <div className="p-3 bg-gray-50 border-b border-gray-100">
         <h4 className="text-sm font-medium text-gray-800 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-primary" />
@@ -110,7 +135,7 @@ export const ProductComparison = ({ productA, productB }) => {
 };
 
 // 4. 参数咨询 - 展示知识库答案和相关商品
-export const ParameterQuery = ({ question, answer, relatedProduct }) => {
+export const ParameterQuery = ({ question: _question, answer, relatedProduct }) => {
   return (
     <div className="space-y-3">
       <div className="bg-gray-50 rounded-lg p-3">
@@ -118,7 +143,7 @@ export const ParameterQuery = ({ question, answer, relatedProduct }) => {
       </div>
       {relatedProduct && (
         <div>
-          <p className="text-xs text-gray-500 mb-2">相关商品推荐：</p>
+          <p className="mb-2 text-xs text-gray-500">商品参数卡：</p>
           <ProductCard product={relatedProduct} showActions={false} />
         </div>
       )}
@@ -127,7 +152,7 @@ export const ParameterQuery = ({ question, answer, relatedProduct }) => {
 };
 
 // 5. 兼容性确认 - 显示兼容、无法确认或转人工状态
-export const CompatibilityCheck = ({ status, deviceType, product, onTransferHuman }) => {
+export const CompatibilityCheck = ({ status, deviceType, product }) => {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
       {status === 'compatible' && (
@@ -137,6 +162,9 @@ export const CompatibilityCheck = ({ status, deviceType, product, onTransferHuma
             <p className="text-sm text-gray-700">
               <span className="font-medium text-green-600">完全兼容！</span>
               {product?.name} 可以正常连接 {deviceType}。
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              连接方式：{product?.connection}；支持平台：{product?.platform}。
             </p>
           </div>
         </div>
@@ -157,14 +185,13 @@ export const CompatibilityCheck = ({ status, deviceType, product, onTransferHuma
           <AlertCircle className="w-5 h-5 text-yellow-500 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm text-gray-700">
-              抱歉，我暂时无法确认 {product?.name} 是否支持 {deviceType}。
+              {deviceType === '该设备'
+                ? `${product?.name}支持${product?.connection}，兼容平台为${product?.platform}。`
+                : `抱歉，我暂时无法确认 ${product?.name} 是否支持 ${deviceType}。`}
             </p>
-            <button 
-              onClick={onTransferHuman}
-              className="mt-2 text-sm text-primary hover:underline"
-            >
-              转接人工客服确认
-            </button>
+            {deviceType !== '该设备' && (
+              <p className="mt-2 text-xs text-gray-500">当前版本暂未接入人工转接，请通过正式渠道确认。</p>
+            )}
           </div>
         </div>
       )}
@@ -172,13 +199,48 @@ export const CompatibilityCheck = ({ status, deviceType, product, onTransferHuma
   );
 };
 
+const QuoteAudit = ({ quote }) => {
+  if (!quote) return null;
+  return (
+    <div className="mt-4 space-y-3 border-t border-gray-100 pt-3">
+      {quote.valuePoints?.length > 0 && (
+        <div>
+          <p className="mb-1 text-xs font-medium text-gray-600">报价前价值点校验</p>
+          <ul className="space-y-1 text-xs text-gray-500">
+            {quote.valuePoints.map(point => <li key={point}>• {point}</li>)}
+          </ul>
+        </div>
+      )}
+      {quote.ruleChecks?.length > 0 && (
+        <div className="grid gap-1.5 sm:grid-cols-2">
+          {quote.ruleChecks.map(check => (
+            <div key={check.name} className={`rounded-lg px-2.5 py-2 text-xs ${check.passed ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>
+              <span className="font-medium">{check.passed ? '✓' : '!'} {check.name}</span>
+              <span className="ml-1 opacity-80">{check.detail}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {quote.missingFields?.length > 0 && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          形成成交报价前还需确认：{quote.missingFields.join('、')}。
+        </p>
+      )}
+      <p className="text-xs text-gray-500">{quote.discountMessage}</p>
+    </div>
+  );
+};
+
 // 6. 询价 - 展示价格卡片
-export const PriceInquiry = ({ product, priceType }) => {
+export const PriceInquiry = ({ product, products = [], priceType, quote }) => {
   const typeLabels = {
     'open': '公开标价',
     'range': '参考区间',
     'estimated': '预估到手价',
-    'formal': '正式成交报价'
+    'formal': '规则成交报价',
+    'promotion': '已确认活动价',
+    'approval_required': '超出自动权限',
+    'rejected_offer': '出价不符合规则'
   };
   
   return (
@@ -198,50 +260,36 @@ export const PriceInquiry = ({ product, priceType }) => {
         )}
       </div>
       
-      {priceType === 'range' ? (
+      {priceType === 'range' || !product ? (
         <div>
-          <p className="text-sm text-gray-600 mb-2">鼠标价格区间：</p>
+          <p className="text-sm text-gray-600 mb-2">L1系列公开零售价：</p>
           <div className="flex items-center gap-4">
-            <span className="text-lg font-bold text-primary">¥89</span>
+            <span className="text-lg font-bold text-primary">¥{Math.min(...products.map(item => item.price))}</span>
             <span className="text-gray-400">~</span>
-            <span className="text-lg font-bold text-primary">¥599</span>
+            <span className="text-lg font-bold text-primary">¥{Math.max(...products.map(item => item.price))}</span>
           </div>
         </div>
       ) : (
         <div>
           <div className="flex items-baseline gap-2 mb-3">
-            <span className="text-3xl font-bold text-primary">¥{product?.price}</span>
-            <span className="text-sm text-gray-400">起</span>
+            <span className="text-3xl font-bold text-primary">¥{quote?.unitPrice ?? product?.price}</span>
+            <span className="text-sm text-gray-400">单价</span>
           </div>
           <div className="text-xs text-gray-500">
             <p>商品：{product?.name}</p>
-            <p>库存：{product?.stock} 件</p>
+            {quote && <p>数量：{quote.quantity}；合计：¥{quote.totalPrice}</p>}
+            {quote && <p>渠道：{quote.channel}；活动：{quote.campaign}</p>}
+            <p>库存：{product?.stockStatus || '待实时查询'}</p>
           </div>
         </div>
       )}
-      
-      {priceType === 'formal' && (
-        <div className="mt-3 pt-3 border-t border-gray-100 text-xs space-y-1">
-          <div className="flex justify-between">
-            <span className="text-gray-500">商品金额</span>
-            <span>¥{product?.price}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500">优惠</span>
-            <span className="text-green-600">-¥50</span>
-          </div>
-          <div className="flex justify-between font-medium">
-            <span>合计</span>
-            <span className="text-primary">¥{product?.price - 50}</span>
-          </div>
-        </div>
-      )}
+      <QuoteAudit quote={quote} />
     </div>
   );
 };
 
 // 7. 议价优惠 - 显示优惠说明或审批提示
-export const BargainPrompt = ({ message, isApproving, onTransferHuman }) => {
+export const BargainPrompt = ({ message, isApproving, quote }) => {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
       {isApproving ? (
@@ -255,14 +303,8 @@ export const BargainPrompt = ({ message, isApproving, onTransferHuman }) => {
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-gray-700">{message}</p>
-          <div className="flex gap-2">
-            <button 
-              onClick={onTransferHuman}
-              className="text-sm text-primary hover:underline"
-            >
-              申请更多优惠 →
-            </button>
-          </div>
+          <p className="text-xs text-gray-500">当前版本不接入人工审批，也不会承诺未确认优惠。</p>
+          <QuoteAudit quote={quote} />
         </div>
       )}
     </div>
