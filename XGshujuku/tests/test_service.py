@@ -125,6 +125,105 @@ class CustomerDataServiceTests(unittest.TestCase):
         self.assertEqual(history[0]["summary"]["result"]["recommended_sku"], "M001")
         self.assertEqual(history[0]["summary"]["knowledge_source_version"], "catalog-2026-08-05")
 
+    def test_conversation_messages_are_saved_in_order(self):
+        session_id = self.service.create_session("web")
+        self.service.record_message(session_id, "user", "预算400元", intent="price_inquiry")
+        self.service.record_message(session_id, "assistant", "建议选择L1基础版", source="rule-engine")
+        messages = self.service.list_messages(session_id)
+        self.assertEqual([item["role"] for item in messages], ["user", "assistant"])
+        self.assertEqual(messages[0]["intent"], "price_inquiry")
+
+    def test_consent_status_changes_after_grant_and_revoke(self):
+        customer_id = self.service.create_customer()
+        self.assertFalse(self.service.consent_status(customer_id)["granted"])
+        self.service.grant_consent(customer_id)
+        self.assertTrue(self.service.consent_status(customer_id)["granted"])
+        self.service.revoke_consent(customer_id)
+        self.assertFalse(self.service.consent_status(customer_id)["granted"])
+
+    def test_quote_version_is_persisted(self):
+        session_id = self.service.create_session("web")
+        quote_id = self.service.record_quote(
+            session_id,
+            "Q-001",
+            {"product": "L1", "unit_price": 399, "quantity": 2, "total": 798},
+        )
+        connection = sqlite3.connect(self.db_path)
+        try:
+            row = connection.execute(
+                "SELECT quote_id, quote_version, amount_json FROM quote_versions WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+        finally:
+            connection.close()
+        self.assertEqual(row[0], quote_id)
+        self.assertEqual(row[1], "Q-001")
+        self.assertIn('"total":798', row[2])
+
+    def test_analysis_context_contains_authorized_sales_data(self):
+        customer_id = self.service.create_customer()
+        session_id = self.service.create_session("web", customer_id)
+        self.service.record_message(session_id, "user", "预算600元，想买游戏鼠标")
+        self.service.put_session_fact(session_id, "budget", 600, "confirmed")
+        self.service.grant_consent(customer_id)
+        self.service.put_long_term_memory(
+            customer_id, "common_device", "Windows", confirmed_stable=True
+        )
+        self.service.record_recommendation(
+            session_id, [{"id": "L1PRO", "name": "L1 Pro"}], "catalog-test"
+        )
+        self.service.record_quote(session_id, "Q-002", {"unitPrice": 599})
+        self.service.save_summary(
+            session_id,
+            {"intent": "purchase"},
+            {"budget": 600},
+            {"recommended": "L1 Pro"},
+            ["购买渠道"],
+            "catalog-test",
+        )
+
+        context = self.service.get_analysis_context(session_id)
+
+        self.assertEqual(context["customer_id"], customer_id)
+        self.assertEqual(context["conversation_messages"][0]["content"], "预算600元，想买游戏鼠标")
+        self.assertEqual(context["session_facts"][0]["fact_type"], "budget")
+        self.assertEqual(context["authorized_long_term_memories"][0]["value"], "Windows")
+        self.assertEqual(context["recommendation_runs"][0]["result"][0]["id"], "L1PRO")
+        self.assertEqual(context["quote_versions"][0]["amount"]["unitPrice"], 599)
+        self.assertEqual(context["behavior_data"]["quote_count"], 1)
+        self.assertEqual(context["latest_session_summary"]["confirmed_info"]["budget"], 600)
+        self.assertEqual(context["behavior_data"]["message_count"], 1)
+        self.assertEqual(context["behavior_data"]["messages_truncated"], False)
+
+    def test_analysis_context_reports_truncation_and_keeps_latest_summary(self):
+        session_id = self.service.create_session("web")
+        for index in range(3):
+            self.service.record_message(session_id, "user", f"消息{index + 1}")
+        self.service.save_summary(
+            session_id, "选购鼠标", {"budget": 400}, "待推荐", ["设备系统"], "catalog-test"
+        )
+
+        context = self.service.get_analysis_context(session_id, message_limit=2)
+
+        self.assertEqual(context["behavior_data"]["message_count"], 3)
+        self.assertEqual(context["behavior_data"]["message_window_count"], 2)
+        self.assertEqual(context["behavior_data"]["messages_truncated"], True)
+        self.assertEqual(context["conversation_messages"][0]["content"], "消息2")
+        self.assertEqual(context["latest_session_summary"]["user_goal"], "选购鼠标")
+
+    def test_analysis_context_excludes_memory_after_consent_revocation(self):
+        customer_id = self.service.create_customer()
+        session_id = self.service.create_session("web", customer_id)
+        self.service.grant_consent(customer_id)
+        self.service.put_long_term_memory(
+            customer_id, "stable_preference", "静音", confirmed_stable=True
+        )
+        self.service.revoke_consent(customer_id)
+
+        context = self.service.get_analysis_context(session_id)
+
+        self.assertEqual(context["authorized_long_term_memories"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

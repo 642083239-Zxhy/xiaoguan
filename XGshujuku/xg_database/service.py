@@ -151,6 +151,17 @@ class CustomerDataService:
             )
         return customer_id
 
+    def get_or_create_customer(self, external_reference: str) -> str:
+        if not external_reference.strip():
+            raise ValueError("external_reference 不能为空")
+        external_hash = _hash(external_reference)
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT customer_id FROM customers WHERE external_ref_hash = ? AND status = 'active'",
+                (external_hash,),
+            ).fetchone()
+        return str(row["customer_id"]) if row else self.create_customer(external_reference)
+
     def create_session(
         self,
         channel: str,
@@ -168,6 +179,72 @@ class CustomerDataService:
                 (session_id, customer_id, channel, expires_at, _iso(now), _iso(now)),
             )
         return session_id
+
+    def record_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        *,
+        source: str | None = None,
+        intent: str | None = None,
+        metadata: Any | None = None,
+    ) -> str:
+        if role not in {"user", "assistant", "system"}:
+            raise ValueError("role 无效")
+        if not str(content).strip():
+            raise ValueError("content 不能为空")
+        _assert_safe({"content": content, "metadata": metadata or {}})
+        message_id = _id("msg")
+        now = _iso(_utcnow())
+        with self._connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO conversation_messages
+                    (message_id, session_id, role, content, source, intent, metadata_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (message_id, session_id, role, str(content), source, intent,
+                 _json(metadata or {}), now),
+            )
+            connection.execute(
+                "UPDATE sessions SET updated_at = ? WHERE session_id = ?",
+                (now, session_id),
+            )
+        return message_id
+
+    def list_messages(self, session_id: str) -> list[dict[str, Any]]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT message_id, role, content, source, intent, metadata_json, created_at
+                FROM conversation_messages
+                WHERE session_id = ? ORDER BY created_at, rowid
+                """,
+                (session_id,),
+            ).fetchall()
+        return [
+            {
+                "message_id": row["message_id"],
+                "role": row["role"],
+                "content": row["content"],
+                "source": row["source"],
+                "intent": row["intent"],
+                "metadata": _load(row["metadata_json"]),
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+
+    def consent_status(self, customer_id: str) -> dict[str, Any]:
+        with self._connection() as connection:
+            consent = self._active_consent(connection, customer_id)
+        return {
+            "granted": consent is not None,
+            "consent_id": consent["consent_id"] if consent else None,
+            "consent_version": consent["consent_version"] if consent else None,
+            "granted_at": consent["granted_at"] if consent else None,
+        }
 
     def put_session_fact(
         self,
@@ -357,6 +434,190 @@ class CustomerDataService:
             resolved[key] = {"value": value, "source": "explicit_current_turn", "priority": 400}
         return resolved
 
+    def get_analysis_context(self, session_id: str, message_limit: int = 50) -> dict[str, Any]:
+        """Return consent-aware session data for purchase-intent analysis."""
+        if not 1 <= message_limit <= 100:
+            raise ValueError("message_limit 必须在 1 到 100 之间")
+
+        with self._connection() as connection:
+            session = connection.execute(
+                """
+                SELECT session_id, customer_id, channel, status, created_at, updated_at
+                FROM sessions WHERE session_id = ?
+                """,
+                (session_id,),
+            ).fetchone()
+            if session is None:
+                raise KeyError(f"会话不存在: {session_id}")
+
+            message_total = connection.execute(
+                "SELECT COUNT(*) FROM conversation_messages WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()[0]
+            messages = connection.execute(
+                """
+                SELECT message_id, role, content, source, intent, metadata_json, created_at
+                FROM (
+                    SELECT rowid AS sequence, message_id, role, content, source, intent,
+                           metadata_json, created_at
+                    FROM conversation_messages
+                    WHERE session_id = ?
+                    ORDER BY created_at DESC, rowid DESC
+                    LIMIT ?
+                )
+                ORDER BY created_at, sequence
+                """,
+                (session_id, message_limit),
+            ).fetchall()
+            facts = connection.execute(
+                """
+                SELECT fact_id, fact_type, value_json, confirmation_status,
+                       source_message_id, created_at, updated_at
+                FROM session_facts
+                WHERE session_id = ? AND active = 1
+                ORDER BY updated_at, rowid
+                """,
+                (session_id,),
+            ).fetchall()
+            recommendations = connection.execute(
+                """
+                SELECT recommendation_id, result_json, knowledge_source_version, created_at
+                FROM recommendation_runs
+                WHERE session_id = ?
+                ORDER BY created_at DESC, rowid DESC
+                LIMIT 10
+                """,
+                (session_id,),
+            ).fetchall()
+            quotes = connection.execute(
+                """
+                SELECT quote_id, quote_version, amount_json, recommendation_id, created_at
+                FROM quote_versions
+                WHERE session_id = ?
+                ORDER BY created_at DESC, rowid DESC
+                LIMIT 10
+                """,
+                (session_id,),
+            ).fetchall()
+            latest_summary = connection.execute(
+                """
+                SELECT summary_id, user_goal_json, confirmed_info_json, result_json,
+                       unresolved_questions_json, knowledge_source_version, created_at
+                FROM session_summaries
+                WHERE session_id = ?
+                ORDER BY created_at DESC, rowid DESC
+                LIMIT 1
+                """,
+                (session_id,),
+            ).fetchone()
+
+            memories: list[sqlite3.Row] = []
+            if session["customer_id"]:
+                memories = connection.execute(
+                    """
+                    SELECT memory_id, memory_type, value_json, source_session_id,
+                           created_at, updated_at
+                    FROM long_term_memories
+                    WHERE customer_id = ? AND status = 'active'
+                      AND consent_id IN (
+                          SELECT consent_id FROM memory_consents
+                          WHERE customer_id = ? AND scope = 'long_term_memory'
+                            AND status = 'granted'
+                      )
+                    ORDER BY updated_at, rowid
+                    """,
+                    (session["customer_id"], session["customer_id"]),
+                ).fetchall()
+
+        conversation_messages = [
+            {
+                "message_id": row["message_id"],
+                "role": row["role"],
+                "content": row["content"],
+                "source": row["source"],
+                "intent": row["intent"],
+                "metadata": _load(row["metadata_json"]),
+                "created_at": row["created_at"],
+            }
+            for row in messages
+        ]
+        session_facts = [
+            {
+                "fact_id": row["fact_id"],
+                "fact_type": row["fact_type"],
+                "value": _load(row["value_json"]),
+                "confirmation_status": row["confirmation_status"],
+                "source_message_id": row["source_message_id"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+            }
+            for row in facts
+        ]
+        authorized_memories = [
+            {
+                "memory_id": row["memory_id"],
+                "memory_type": row["memory_type"],
+                "value": _load(row["value_json"]),
+                "source_session_id": row["source_session_id"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+            }
+            for row in memories
+        ]
+        recommendation_runs = [
+            {
+                "recommendation_id": row["recommendation_id"],
+                "result": _load(row["result_json"]),
+                "knowledge_source_version": row["knowledge_source_version"],
+                "created_at": row["created_at"],
+            }
+            for row in recommendations
+        ]
+        quote_versions = [
+            {
+                "quote_id": row["quote_id"],
+                "quote_version": row["quote_version"],
+                "amount": _load(row["amount_json"]),
+                "recommendation_id": row["recommendation_id"],
+                "created_at": row["created_at"],
+            }
+            for row in quotes
+        ]
+        session_summary = None if latest_summary is None else {
+            "summary_id": latest_summary["summary_id"],
+            "user_goal": _load(latest_summary["user_goal_json"]),
+            "confirmed_info": _load(latest_summary["confirmed_info_json"]),
+            "result": _load(latest_summary["result_json"]),
+            "unresolved_questions": _load(latest_summary["unresolved_questions_json"]),
+            "knowledge_source_version": latest_summary["knowledge_source_version"],
+            "created_at": latest_summary["created_at"],
+        }
+        return {
+            "customer_id": session["customer_id"],
+            "session_id": session["session_id"],
+            "last_interaction_at": (
+                conversation_messages[-1]["created_at"]
+                if conversation_messages else session["updated_at"]
+            ),
+            "conversation_messages": conversation_messages,
+            "session_facts": session_facts,
+            "authorized_long_term_memories": authorized_memories,
+            "recommendation_runs": recommendation_runs,
+            "quote_versions": quote_versions,
+            "latest_session_summary": session_summary,
+            "behavior_data": {
+                "message_count": message_total,
+                "message_window_count": len(conversation_messages),
+                "message_window_limit": message_limit,
+                "messages_truncated": message_total > len(conversation_messages),
+                "user_message_count": sum(
+                    item["role"] == "user" for item in conversation_messages
+                ),
+                "recommendation_count": len(recommendation_runs),
+                "quote_count": len(quote_versions),
+            },
+        }
+
     def record_recommendation(
         self, session_id: str, result: Any, knowledge_source_version: str
     ) -> str:
@@ -480,6 +741,17 @@ class CustomerDataService:
                     }
                 history.append(item)
         return history
+
+    def delete_session(self, session_id: str) -> None:
+        with self._connection() as connection:
+            cursor = connection.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+            if cursor.rowcount == 0:
+                raise KeyError(f"会话不存在: {session_id}")
+
+    def clear_session_history(self, customer_id: str) -> int:
+        with self._connection() as connection:
+            cursor = connection.execute("DELETE FROM sessions WHERE customer_id = ?", (customer_id,))
+        return cursor.rowcount
 
     def delete_long_term_memory(self, customer_id: str, memory_type: str) -> str:
         now = _utcnow()

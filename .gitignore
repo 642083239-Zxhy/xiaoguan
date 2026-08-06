@@ -11,6 +11,17 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.example
+
+# Python 与本地客户数据
+**/__pycache__/
+*.py[cod]
+XGshujuku/data/
+*.db
+*.db-shm
+*.db-wal
 
 # Editor directories and files
 .vscode/*

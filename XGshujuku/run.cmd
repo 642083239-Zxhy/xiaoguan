@@ -31,8 +31,10 @@ if /I "%XG_COMMAND%"=="test" (
     "%XG_PYTHON%" -B -m xg_database.cli --db "%XG_DATABASE%" demo
 ) else if /I "%XG_COMMAND%"=="cleanup" (
     "%XG_PYTHON%" -B -m xg_database.cli --db "%XG_DATABASE%" cleanup
+) else if /I "%XG_COMMAND%"=="serve" (
+    "%XG_PYTHON%" -B -m xg_database.http_api --db "%XG_DATABASE%" --host 127.0.0.1 --port 8765
 ) else (
-    echo Usage: run.cmd [init^|demo^|cleanup^|test] [database-path]
+    echo Usage: run.cmd [init^|demo^|cleanup^|test^|serve] [database-path]
     popd
     exit /b 2
 )
