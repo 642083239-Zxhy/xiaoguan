@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Brain, CheckCircle2, Database, Loader2, ShieldCheck, Trash2, X } from 'lucide-react';
+import { AlertCircle, Brain, CheckCircle2, Database, Loader2, ShieldCheck, Trash2, X } from 'lucide-react';
 import {
   deleteStableMemory,
   getMemoryOverview,
@@ -19,37 +19,51 @@ const MemoryPanel = ({ isOpen, onClose, frontendSessionId, currentCriteria, onSt
   const [overview, setOverview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
+  const [noticeType, setNoticeType] = useState('success');
 
+  // 统一管理提示显示：错误类型 5 秒后自动消失，成功类型 3 秒后自动消失
+  const showNotice = (message, type = 'success') => {
+    setNotice(message);
+    setNoticeType(type);
+    const duration = type === 'error' ? 5000 : 3000;
+    setTimeout(() => setNotice(prev => (prev === message ? '' : prev)), duration);
+  };
+
+  // 刷新记忆概览：不清空 notice，避免覆盖 run 中刚设置的成功提示
   const refresh = useCallback(async () => {
     setLoading(true);
-    setNotice('');
     try {
       const data = await getMemoryOverview(frontendSessionId);
       setOverview(data);
       onStatusChange?.('connected');
     } catch (error) {
-      setNotice(error.message);
+      showNotice(error.message, 'error');
       onStatusChange?.('offline');
     } finally {
       setLoading(false);
     }
   }, [frontendSessionId, onStatusChange]);
 
+  // 面板打开时刷新数据并清空旧提示
   useEffect(() => {
-    if (isOpen) refresh();
+    if (isOpen) {
+      setNotice('');
+      refresh();
+    }
   }, [isOpen, refresh]);
 
   if (!isOpen) return null;
 
+  // 执行授权/保存/删除操作：成功后刷新数据并显示成功提示
   const run = async (action, successMessage) => {
     setLoading(true);
     setNotice('');
     try {
       await action();
-      setNotice(successMessage);
       await refresh();
+      showNotice(successMessage, 'success');
     } catch (error) {
-      setNotice(error.message);
+      showNotice(error.message, 'error');
       setLoading(false);
     }
   };
@@ -123,30 +137,42 @@ const MemoryPanel = ({ isOpen, onClose, frontendSessionId, currentCriteria, onSt
                 {overview.consent.granted && (
                   <div className="mt-4 grid gap-2 sm:grid-cols-2">
                     <button
-                      disabled={!hasPreference || loading}
-                      onClick={() => run(
-                        () => saveStableMemory({
-                          customerId: overview.customerId,
-                          sessionId: overview.sessionId,
-                          memoryType: 'stable_preference',
-                          value: preference
-                        }),
-                        '当前场景/型号已确认为稳定偏好。'
-                      )}
-                      className="rounded-lg border border-purple-400/30 px-3 py-2 text-xs text-purple-200 hover:bg-purple-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={loading}
+                      onClick={() => {
+                        if (!hasPreference) {
+                          showNotice('暂无偏好数据，请先在对话中告知您的使用场景或预算，以便AI为您记录稳定偏好。', 'error');
+                          return;
+                        }
+                        run(
+                          () => saveStableMemory({
+                            customerId: overview.customerId,
+                            sessionId: overview.sessionId,
+                            memoryType: 'stable_preference',
+                            value: preference
+                          }),
+                          '当前场景/型号已确认为稳定偏好。'
+                        );
+                      }}
+                      className="rounded-lg border border-purple-400/30 px-3 py-2 text-xs text-purple-200 hover:bg-purple-500/10 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
                     >保存当前稳定偏好</button>
                     <button
-                      disabled={!currentCriteria.device || loading}
-                      onClick={() => run(
-                        () => saveStableMemory({
-                          customerId: overview.customerId,
-                          sessionId: overview.sessionId,
-                          memoryType: 'common_device',
-                          value: currentCriteria.device
-                        }),
-                        '当前设备已确认为常用设备。'
-                      )}
-                      className="rounded-lg border border-cyan-400/30 px-3 py-2 text-xs text-cyan-200 hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={loading}
+                      onClick={() => {
+                        if (!currentCriteria.device) {
+                          showNotice('暂无常用设备信息，请先在对话中提及您使用的设备（如Mac、Windows等），以便AI为您记录。', 'error');
+                          return;
+                        }
+                        run(
+                          () => saveStableMemory({
+                            customerId: overview.customerId,
+                            sessionId: overview.sessionId,
+                            memoryType: 'common_device',
+                            value: currentCriteria.device
+                          }),
+                          '当前设备已确认为常用设备。'
+                        );
+                      }}
+                      className="rounded-lg border border-cyan-400/30 px-3 py-2 text-xs text-cyan-200 hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
                     >保存当前常用设备</button>
                   </div>
                 )}
@@ -176,9 +202,26 @@ const MemoryPanel = ({ isOpen, onClose, frontendSessionId, currentCriteria, onSt
           ) : null}
 
           {notice && (
-            <div className="flex items-start gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
-              <span>{notice}</span>
+            <div
+              role="alert"
+              className={`fixed right-4 top-4 z-[90] flex max-w-sm items-start gap-2 rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur-md ${
+                noticeType === 'error'
+                  ? 'border-red-400/50 bg-red-500/25 text-red-50'
+                  : 'border-emerald-400/50 bg-emerald-500/25 text-emerald-50'
+              }`}
+            >
+              {noticeType === 'error'
+                ? <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                : <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              }
+              <span className="flex-1">{notice}</span>
+              <button
+                onClick={() => setNotice('')}
+                className="ml-2 rounded p-0.5 text-current opacity-70 hover:opacity-100"
+                aria-label="关闭提示"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
           )}
         </div>
