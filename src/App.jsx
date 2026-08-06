@@ -1,113 +1,240 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Header from './components/Header';
 import ChatArea from './components/ChatArea';
 import HistorySidebar from './components/HistorySidebar';
 import StatusPanel from './components/StatusPanel';
-import { sendMessageToAI, getHistorySessions, saveSession, deleteSession } from './services/api';
+import AdminPanel from './components/AdminPanel';
+import ApiSettingsModal from './components/ApiSettingsModal';
+import MemoryPanel from './components/MemoryPanel';
+import {
+  deleteSession,
+  clearHistorySessions,
+  getHistorySessions,
+  hasApiConfig,
+  saveSession,
+  sendMessageToAI
+} from './services/api';
+import { trackConversion, trackSession } from './services/dataStore';
+import {
+  clearMemoryHistory,
+  deleteMemorySession,
+  getResolvedMemoryCriteria,
+  initializeMemorySession,
+  recordMemoryMessage,
+  syncMemoryTurn
+} from './services/memoryApi';
 
-/**
- * 主应用组件
- * 整合所有功能模块，管理全局状态
- */
+const nowTime = () => new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+const createSessionId = () => `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+const responseText = response => response.content
+  || response.data?.answer
+  || response.data?.message
+  || (response.data?.products?.length
+    ? `推荐：${response.data.products.map(product => product.name).join('、')}`
+    : `结构化回复：${JSON.stringify(response.data || { intent: response.intent || response.type })}`);
+
 function App() {
-  // 消息列表
   const [messages, setMessages] = useState([]);
-  // 加载状态
   const [isLoading, setIsLoading] = useState(false);
-  // 当前会话ID
-  const [currentSessionId] = useState(() => 
-    localStorage.getItem('chat_session_id') || `session_${Date.now()}`
+  const [currentSessionId, setCurrentSessionId] = useState(
+    () => localStorage.getItem('chat_session_id') || createSessionId()
   );
-  
-  // 历史会话
   const [sessions, setSessions] = useState([]);
-  // 侧边栏状态
   const [showHistory, setShowHistory] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
-  
-  // 当前选购条件
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [showApiSettings, setShowApiSettings] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
+  const [apiConfigured, setApiConfigured] = useState(() => hasApiConfig());
+  const [memoryStatus, setMemoryStatus] = useState('checking');
   const [currentCriteria, setCurrentCriteria] = useState({});
-  // 候选商品列表
   const [candidates, setCandidates] = useState([]);
+  const [lastAnalysis, setLastAnalysis] = useState(null);
 
-  // 初始化加载历史会话
   useEffect(() => {
     const historySessions = getHistorySessions();
     setSessions(historySessions);
-  }, []);
+    localStorage.setItem('chat_session_id', currentSessionId);
+    trackSession(currentSessionId);
+    const current = historySessions.find(session => session.id === currentSessionId);
+    if (current) {
+      setMessages(current.messages || []);
+      setCurrentCriteria(current.criteria || {});
+      setCandidates(current.candidates || []);
+      setLastAnalysis(current.lastAnalysis || null);
+    }
+  }, [currentSessionId]);
 
-  /**
-   * 发送消息处理
-   */
-  const handleSendMessage = useCallback(async (content) => {
-    // 添加用户消息
-    const userMessage = {
-      type: 'user',
-      content,
-      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  useEffect(() => {
+    let active = true;
+    setMemoryStatus('checking');
+    initializeMemorySession(currentSessionId)
+      .then(() => getResolvedMemoryCriteria(currentSessionId))
+      .then(memoryCriteria => {
+        if (!active) return;
+        setCurrentCriteria(previous => ({ ...memoryCriteria, ...previous }));
+        setMemoryStatus('connected');
+      })
+      .catch(() => active && setMemoryStatus('offline'));
+    return () => { active = false; };
+  }, [currentSessionId]);
+
+  useEffect(() => {
+    if (!messages.length) return;
+    const session = {
+      id: currentSessionId,
+      title: messages.find(message => message.type === 'user')?.content?.slice(0, 20) || '新对话',
+      lastTime: new Date().toLocaleString('zh-CN'),
+      lastQuery: [...messages].reverse().find(message => message.type === 'user')?.content?.slice(0, 30) || '',
+      updatedAt: new Date().toISOString(),
+      messages,
+      criteria: currentCriteria,
+      candidates,
+      lastAnalysis
     };
-    setMessages(prev => [...prev, userMessage]);
+    setSessions(saveSession(session));
+  }, [messages, currentCriteria, candidates, currentSessionId, lastAnalysis]);
+
+  const handleSendMessage = useCallback(async (content) => {
+    const userMessage = { type: 'user', content, time: nowTime() };
+    setMessages(previous => [...previous, userMessage]);
     setIsLoading(true);
-    
+
     try {
-      // 获取AI响应
       const response = await sendMessageToAI(content, messages, currentCriteria);
-      
-      // 添加AI消息
+      const { type: responseType, criteriaUpdates, criteriaReset, analysis, ...responsePayload } = response;
       const aiMessage = {
         type: 'ai',
-        ...response,
-        time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+        responseType,
+        ...responsePayload,
+        analysis,
+        time: nowTime()
       };
-      setMessages(prev => [...prev, aiMessage]);
-      
-      // 如果是商品推荐，更新候选列表
-      if (response.intent === 'product_recommendation' && response.data?.products) {
-        setCandidates(response.data.products.map(p => ({
-          ...p,
-          status: p.stock > 50 ? 'available' : p.stock > 10 ? 'low' : 'out'
-        })));
+      setMessages(previous => [...previous, aiMessage]);
+      setLastAnalysis(analysis || null);
+      if (criteriaReset) {
+        setCurrentCriteria({});
+        setCandidates([]);
       }
+      if (criteriaUpdates && Object.keys(criteriaUpdates).length) {
+        setCurrentCriteria(previous => ({ ...previous, ...criteriaUpdates }));
+      }
+      let nextCriteria = criteriaReset ? {} : { ...currentCriteria, ...criteriaUpdates };
+      let nextCandidates = criteriaReset ? [] : candidates;
+      if (response.intent === 'product_recommendation' && response.data?.products) {
+        nextCandidates = response.data.products.map(product => ({
+          ...product,
+          status: product.stock == null ? 'unknown' : product.stock > 50 ? 'available' : product.stock > 10 ? 'low' : 'out'
+        }));
+        setCandidates(nextCandidates);
+      }
+      recordMemoryMessage(currentSessionId, {
+        role: 'user',
+        content,
+        intent: analysis?.primary_intent,
+        metadata: { criteria: currentCriteria }
+      })
+        .then(() => recordMemoryMessage(currentSessionId, {
+          role: 'assistant',
+          content: responseText(response),
+          source: response.source || 'rule-engine',
+          intent: analysis?.primary_intent,
+          metadata: { response_type: responseType }
+        }))
+        .then(() => syncMemoryTurn({
+          frontendSessionId: currentSessionId,
+          criteria: nextCriteria,
+          candidates: nextCandidates,
+          analysis,
+          quote: response.quote,
+          summary: {
+            user_goal: { query: content, intent: analysis?.primary_intent || 'unknown' },
+            confirmed_info: nextCriteria,
+            result: {
+              response_type: responseType,
+              candidates: nextCandidates.map(item => item.name),
+              quote: response.quote || null
+            },
+            unresolved_questions: analysis?.next_action === '追问' ? ['预算或使用条件仍需确认'] : []
+          }
+        }))
+        .then(() => setMemoryStatus('connected'))
+        .catch(() => setMemoryStatus('offline'));
     } catch (error) {
-      // 错误处理
-      const errorMessage = {
-        type: 'text',
-        content: '抱歉，服务暂时不可用，请稍后重试。',
-        time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(previous => [...previous, {
+        type: 'ai',
+        responseType: 'text',
+        content: `调用失败：${error.message || '服务暂时不可用，请稍后重试。'}`,
+        time: nowTime()
+      }]);
     } finally {
       setIsLoading(false);
     }
-  }, [messages, currentCriteria]);
+  }, [messages, currentCriteria, candidates, currentSessionId]);
 
-  /**
-   * 意图动作处理
-   */
+  const handleNewSession = useCallback(() => {
+    const nextId = createSessionId();
+    localStorage.setItem('chat_session_id', nextId);
+    setCurrentSessionId(nextId);
+    setMessages([]);
+    setCurrentCriteria({});
+    setCandidates([]);
+    setLastAnalysis(null);
+    setShowHistory(false);
+  }, []);
+
   const handleIntentAction = useCallback((actionType, payload) => {
     switch (actionType) {
       case 'select_scene':
-        setCurrentCriteria(prev => ({ ...prev, scene: payload }));
+        setCurrentCriteria(previous => ({ ...previous, scene: payload }));
         handleSendMessage(`我主要用于${payload}`);
         break;
       case 'select_budget':
-        setCurrentCriteria(prev => ({ ...prev, budget: payload }));
+        setCurrentCriteria(previous => ({ ...previous, budget: payload }));
         handleSendMessage(`我的预算是${payload}`);
         break;
-      case 'transfer_human':
-        handleSendMessage('转人工客服');
-        break;
-      case 'contact_human':
-        handleSendMessage('联系人工顾问');
-        break;
-      case 'contact_enterprise':
-        handleSendMessage('企业采购');
+      case 'select_device':
+        setCurrentCriteria(previous => ({ ...previous, device: payload }));
+        handleSendMessage(`我的设备系统是${payload}`);
         break;
       case 'buy_now':
-        handleSendMessage('我要购买这款');
+        trackConversion('purchase', currentSessionId);
+        setMessages(previous => [...previous, {
+          type: 'ai',
+          responseType: 'text',
+          content: `${payload?.name || '所选商品'}暂未配置正式购买链接，当前版本不会生成虚假地址。`,
+          time: nowTime()
+        }]);
+        break;
+      case 'contact_human':
+      case 'transfer_human':
+      case 'call_human':
+      case 'chat_human':
+        trackConversion('contact', currentSessionId);
+        setMessages(previous => [...previous, {
+          type: 'ai',
+          responseType: 'text',
+          content: '当前版本暂未接入人工转接，不会显示虚假的排队状态或联系电话。',
+          time: nowTime()
+        }]);
+        break;
+      case 'contact_enterprise':
+        trackConversion('contact', currentSessionId);
+        handleSendMessage('企业采购');
         break;
       case 'start_shopping':
-        handleSendMessage('继续选购');
+        handleSendMessage('继续选购鼠标');
+        break;
+      case 'clear_criteria':
+        setCurrentCriteria({});
+        setCandidates([]);
+        setMessages(previous => [...previous, {
+          type: 'ai',
+          responseType: 'text',
+          content: '已清空当前选购条件，你可以重新输入预算、场景或型号。',
+          source: 'rule-engine',
+          time: nowTime()
+        }]);
         break;
       case 'continue_session':
         setShowHistory(false);
@@ -115,106 +242,62 @@ function App() {
       case 'new_session':
         handleNewSession();
         break;
-      case 'call_human':
-        // 模拟电话联系
-        const phoneMessage = {
-          type: 'text',
-          content: '正在为您接通客服电话：400-888-8888',
-          time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-        };
-        setMessages(prev => [...prev, phoneMessage]);
-        break;
-      case 'chat_human':
-        handleSendMessage('在线咨询人工客服');
-        break;
       default:
         break;
     }
-  }, [handleSendMessage]);
+  }, [currentSessionId, handleNewSession, handleSendMessage]);
 
-  /**
-   * 新建会话
-   */
-  const handleNewSession = useCallback(() => {
-    // 保存当前会话
-    if (messages.length > 0) {
-      const session = {
-        id: currentSessionId,
-        title: messages[0]?.content?.slice(0, 20) || '新对话',
-        lastTime: new Date().toLocaleString('zh-CN'),
-        lastQuery: messages[messages.length - 1]?.content?.slice(0, 30) || '',
-        messages: [...messages],
-        criteria: { ...currentCriteria },
-        candidates: [...candidates]
-      };
-      saveSession(session);
-      setSessions(prev => [session, ...prev.filter(s => s.id !== currentSessionId)]);
-    }
-    
-    // 重置状态
-    setMessages([]);
-    setCurrentCriteria({});
-    setCandidates([]);
-    localStorage.setItem('chat_session_id', `session_${Date.now()}`);
-  }, [messages, currentSessionId, currentCriteria, candidates]);
-
-  /**
-   * 选择历史会话
-   */
   const handleSelectSession = useCallback((session) => {
+    localStorage.setItem('chat_session_id', session.id);
+    setCurrentSessionId(session.id);
     setMessages(session.messages || []);
     setCurrentCriteria(session.criteria || {});
     setCandidates(session.candidates || []);
-    localStorage.setItem('chat_session_id', session.id);
+    setLastAnalysis(session.lastAnalysis || null);
     setShowHistory(false);
   }, []);
 
-  /**
-   * 删除会话
-   */
   const handleDeleteSession = useCallback((sessionId) => {
-    deleteSession(sessionId);
-    setSessions(prev => prev.filter(s => s.id !== sessionId));
-  }, []);
+    setSessions(deleteSession(sessionId));
+    deleteMemorySession(sessionId).catch(() => setMemoryStatus('offline'));
+    if (sessionId === currentSessionId) handleNewSession();
+  }, [currentSessionId, handleNewSession]);
 
-  /**
-   * 移除选购条件
-   */
+  const handleClearHistory = useCallback(() => {
+    setSessions(clearHistorySessions());
+    clearMemoryHistory().catch(() => setMemoryStatus('offline'));
+    handleNewSession();
+  }, [handleNewSession]);
+
   const handleRemoveCriteria = useCallback((key) => {
-    setCurrentCriteria(prev => {
-      const next = { ...prev };
+    setCurrentCriteria(previous => {
+      const next = { ...previous };
       delete next[key];
       return next;
     });
   }, []);
 
-  /**
-   * 清空选购条件
-   */
   const handleClearCandidates = useCallback(() => {
     setCurrentCriteria({});
     setCandidates([]);
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col dragon-bg cyber-grid-bg relative overflow-hidden">
-      {/* 背景装饰 - 浮动光珠 */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <div className="floating-orb" />
-        <div className="floating-orb" style={{ animationDelay: '-10s' }} />
-        {/* 星星点缀 */}
-        <div className="absolute top-[15%] left-[10%] w-1 h-1 bg-violet-400 rounded-full twinkle" />
-        <div className="absolute top-[40%] right-[20%] w-1 h-1 bg-fuchsia-400 rounded-full twinkle" style={{ animationDelay: '0.5s' }} />
-        <div className="absolute bottom-[30%] left-[30%] w-1.5 h-1.5 bg-cyan-400 rounded-full twinkle" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-[60%] right-[10%] w-1 h-1 bg-violet-300 rounded-full twinkle" style={{ animationDelay: '1.5s' }} />
-      </div>
-      
-      {/* 顶部导航 */}
-      <Header />
-      
-      {/* 主内容区域 */}
-      <main className="flex-1 mt-14">
-        <div className="max-w-6xl mx-auto h-[calc(100vh-56px)]">
+    <div className="thunder-theme cyber-grid-bg relative min-h-screen overflow-hidden">
+      <div className="dragon-orb dragon-orb-left" />
+      <div className="dragon-orb dragon-orb-right" />
+      <Header
+        onOpenHistory={() => setShowHistory(true)}
+        onContact={() => handleIntentAction('contact_human')}
+        onOpenAdmin={() => setShowAdmin(true)}
+        onOpenApiSettings={() => setShowApiSettings(true)}
+        onOpenMemory={() => setShowMemory(true)}
+        apiConfigured={apiConfigured}
+        memoryStatus={memoryStatus}
+      />
+
+      <main className="relative z-10 mt-16 px-0 py-0 lg:px-4 lg:py-4">
+        <div className="glass-dark neon-border mx-auto h-[calc(100vh-64px)] max-w-6xl overflow-hidden lg:h-[calc(100vh-96px)] lg:rounded-3xl">
           <ChatArea
             messages={isLoading ? [...messages, { type: 'loading' }] : messages}
             onSendMessage={handleSendMessage}
@@ -222,28 +305,49 @@ function App() {
             onOpenStatusPanel={() => setShowStatus(true)}
             currentCriteria={currentCriteria}
             candidateCount={candidates.length}
+            apiConfigured={apiConfigured}
           />
         </div>
       </main>
-      
-      {/* 历史会话侧边栏 */}
+
       <HistorySidebar
         isOpen={showHistory}
         onClose={() => setShowHistory(false)}
         sessions={sessions}
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
+        onClearHistory={handleClearHistory}
         onNewSession={handleNewSession}
       />
-      
-      {/* 状态面板 */}
+
       <StatusPanel
         isOpen={showStatus}
         onClose={() => setShowStatus(false)}
         currentCriteria={currentCriteria}
         candidates={candidates}
+        lastAnalysis={lastAnalysis}
         onRemoveCriteria={handleRemoveCriteria}
         onClearCandidates={handleClearCandidates}
+      />
+
+      <AdminPanel
+        isOpen={showAdmin}
+        onClose={() => setShowAdmin(false)}
+        onDataChange={() => setCandidates([])}
+      />
+
+      <ApiSettingsModal
+        isOpen={showApiSettings}
+        onClose={() => setShowApiSettings(false)}
+        onConfigChange={setApiConfigured}
+      />
+
+      <MemoryPanel
+        isOpen={showMemory}
+        onClose={() => setShowMemory(false)}
+        frontendSessionId={currentSessionId}
+        currentCriteria={currentCriteria}
+        onStatusChange={setMemoryStatus}
       />
     </div>
   );

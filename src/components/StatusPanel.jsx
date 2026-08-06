@@ -1,11 +1,11 @@
 import React from 'react';
-import { Tag, Package, X, Zap } from 'lucide-react';
+import { BrainCircuit, Package, Tag, X, Zap } from 'lucide-react';
 
 /**
  * 会话状态面板组件
  * 雷龙品牌 - 赛博朋克紫色主题
  */
-const StatusPanel = ({ currentCriteria, candidates, onRemoveCriteria, onClearCandidates, isOpen, onClose }) => {
+const StatusPanel = ({ currentCriteria, candidates, lastAnalysis, onRemoveCriteria, onClearCandidates, isOpen, onClose }) => {
   if (!isOpen) return null;
 
   const criteriaLabels = {
@@ -13,13 +13,18 @@ const StatusPanel = ({ currentCriteria, candidates, onRemoveCriteria, onClearCan
     budget: '预算',
     device: '设备',
     hand: '手型',
-    preference: '偏好'
+    preference: '偏好',
+    model: '型号',
+    quantity: '数量',
+    channel: '渠道',
+    campaign: '活动'
   };
 
   const candidatesStatus = {
-    available: { label: '有货', class: 'bg-green-500/15 text-green-400 border-green-500/30' },
-    low: { label: '紧张', class: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' },
-    out: { label: '缺货', class: 'bg-red-500/15 text-red-400 border-red-500/30' }
+    available: 'bg-green-100 text-green-700',
+    low: 'bg-yellow-100 text-yellow-700',
+    out: 'bg-red-100 text-red-700',
+    unknown: 'bg-gray-100 text-gray-600'
   };
 
   return (
@@ -51,6 +56,30 @@ const StatusPanel = ({ currentCriteria, candidates, onRemoveCriteria, onClearCan
               <X className="w-5 h-5" />
             </button>
           </div>
+        </div>
+
+        {/* 最近一次内部路由结果 */}
+        <div className="p-4 border-b border-gray-100">
+          <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-1">
+            <BrainCircuit className="w-4 h-4" />
+            最近路由分析
+          </h3>
+          {!lastAnalysis ? (
+            <p className="text-xs text-gray-400">发送问题后显示</p>
+          ) : (
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between"><span className="text-gray-400">主意图</span><span className="font-medium text-gray-700">{lastAnalysis.primary_intent_label}</span></div>
+              <div className="flex justify-between"><span className="text-gray-400">置信度</span><span className="text-gray-700">{Math.round(lastAnalysis.confidence * 100)}%</span></div>
+              <div className="flex justify-between"><span className="text-gray-400">情绪</span><span className="text-gray-700">{lastAnalysis.sentiment}</span></div>
+              <div className="flex justify-between"><span className="text-gray-400">下一动作</span><span className="text-gray-700">{lastAnalysis.next_action}</span></div>
+              <div className="flex justify-between"><span className="text-gray-400">次意图</span><span className="text-gray-700">{lastAnalysis.secondary_intent_labels?.join('、') || '无'}</span></div>
+              <div className="flex justify-between"><span className="text-gray-400">风险标记</span><span className="text-gray-700">{lastAnalysis.risk_flags?.join('、') || '无'}</span></div>
+              <div>
+                <span className="text-gray-400">实体：</span>
+                <span className="ml-1 break-all text-gray-700">{Object.keys(lastAnalysis.entities || {}).length ? JSON.stringify(lastAnalysis.entities) : '无'}</span>
+              </div>
+            </div>
+          )}
         </div>
         
         {/* 当前选购条件 */}
@@ -144,6 +173,9 @@ const StatusPanel = ({ currentCriteria, candidates, onRemoveCriteria, onClearCan
                         {status.label}
                       </span>
                     </div>
+                    <span className={`px-2 py-0.5 rounded text-xs ${candidatesStatus[candidate.status] || 'bg-gray-100 text-gray-700'}`}>
+                      {candidate.status === 'available' ? '有货' : candidate.status === 'low' ? '紧张' : candidate.status === 'out' ? '缺货' : '待查询'}
+                    </span>
                   </div>
                 );
               })}

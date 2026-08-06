@@ -5,91 +5,72 @@
 // SKU商品数据
 export const mockSkus = [
   {
-    id: 'SKU001',
-    name: 'LightPro X1',
-    tier: '入门',
-    scenario: '办公',
-    dpi: '8000',
-    weight: '52g',
-    connection: '无线/有线双模',
-    price: 129,
-    stock: 156,
-    reason: '适合静音办公，轻巧便携',
-    target: '办公用户'
+    id: 'L1',
+    name: 'L1 基础版',
+    tier: '基础版',
+    scenario: '游戏/办公',
+    sensor: '原相3360改版',
+    dpi: '100-12000',
+    ips: '400 IPS',
+    acceleration: '40G',
+    pollingRate: '2.4G 1000Hz / 有线 2000Hz',
+    weight: '≤58g',
+    connection: '2.4G+蓝牙5.0+有线三模',
+    battery: '≥80小时（1000Hz、灯效关闭）',
+    switchLife: '欧姆龙蓝点5000万次',
+    platform: 'Windows/macOS',
+    warranty: '整机2年，微动3年',
+    price: 399,
+    promotionFloor: 349,
+    stock: null,
+    stockStatus: '待实时查询',
+    reason: '兼顾轻量化、三模连接与入门竞技性能',
+    target: '预算约400元的游戏玩家与多设备用户'
   },
   {
-    id: 'SKU002',
-    name: 'GamePro M2',
-    tier: '进阶',
-    scenario: '游戏',
-    dpi: '16000',
-    weight: '63g',
-    connection: '无线/有线双模',
-    price: 299,
-    stock: 89,
-    reason: '电竞级传感器，响应迅速',
-    target: 'FPS/MOBA玩家'
-  },
-  {
-    id: 'SKU003',
-    name: 'Flagship Ultra',
-    tier: '旗舰',
-    scenario: '游戏',
-    dpi: '26000',
-    weight: '58g',
-    connection: '无线/有线双模',
+    id: 'L1PRO',
+    name: 'L1 Pro',
+    tier: 'Pro版',
+    scenario: '游戏/电竞',
+    sensor: 'PixArt PAW3950',
+    dpi: '100-26000',
+    ips: '650 IPS',
+    acceleration: '50G',
+    pollingRate: '2.4G 1000Hz / 有线 4000Hz',
+    weight: '≤55g',
+    connection: '2.4G+蓝牙5.0+有线三模',
+    battery: '≥80小时（1000Hz、灯效关闭）',
+    switchLife: '欧姆龙蓝点5000万次',
+    platform: 'Windows/macOS',
+    warranty: '整机2年，微动3年',
     price: 599,
-    stock: 23,
-    reason: 'PAW3395旗舰芯片，支持8K回报率',
-    target: '专业电竞选手'
-  },
-  {
-    id: 'SKU004',
-    name: 'Designer Slim',
-    tier: '进阶',
-    scenario: '设计',
-    dpi: '12000',
-    weight: '49g',
-    connection: '蓝牙/有线',
-    price: 349,
-    stock: 45,
-    reason: '对称式设计，长时间使用不疲劳',
-    target: '设计师/办公'
-  },
-  {
-    id: 'SKU005',
-    name: 'SilentClick Mini',
-    tier: '入门',
-    scenario: '办公',
-    dpi: '4000',
-    weight: '55g',
-    connection: '静音微动',
-    price: 89,
-    stock: 234,
-    reason: '静音设计，不打扰他人',
-    target: '办公/图书馆'
+    promotionFloor: 549,
+    stock: null,
+    stockStatus: '待实时查询',
+    reason: 'PAW3950旗舰传感器、55g级轻量化与更高有线回报率',
+    target: '追求旗舰性能的FPS及电竞玩家'
   }
 ];
 
 // FAQ数据
 export const mockFaqs = [
-  { id: 1, question: '这款鼠标支持Mac吗？', answer: '是的，所有鼠标都支持Mac系统，包括MacBook Pro和Mac Mini。' },
-  { id: 2, question: '保修政策是什么？', answer: '我们提供1年免费保修，非人为损坏均可享受。' },
-  { id: 3, question: '鼠标电池能用多久？', answer: '常规使用情况下可续航30天，快速充电10分钟可用5天。' },
-  { id: 4, question: 'DPI是什么意思？', answer: 'DPI是鼠标灵敏度指标，数值越大移动越快，办公用建议800-1600，游戏用建议4000以上。' }
+  { id: 1, question: 'L1系列支持Mac吗？', answer: '支持Windows与macOS，可通过2.4G、蓝牙5.0或有线方式连接。' },
+  { id: 2, question: '保修政策是什么？', answer: '整机质保2年，微动开关质保3年；质保期内非人为损坏免费换新。' },
+  { id: 3, question: '鼠标续航多久？', answer: 'L1与L1 Pro在1000Hz回报率、灯效关闭条件下续航均不少于80小时；开启灯效时不低于40小时。' },
+  { id: 4, question: 'L1和L1 Pro有什么区别？', answer: '主要区别是传感器、DPI上限、追踪速度、加速度、有线回报率和重量。L1售价399元，L1 Pro售价599元。' }
 ];
 
 // 话术配置
 export const mockScripts = {
   welcome: '您好！我是AI鼠标选购顾问，可以根据用途和预算帮您推荐最合适的鼠标。请问有什么可以帮您的？',
   priceQuery: '我来为您介绍这款鼠标的价格信息。',
-  priceRange: '我们的鼠标价格区间比较宽，从89元的入门款到599元的旗舰款都有，您的预算大概是多少呢？',
-  recommend: '根据您的需求，我为您推荐以下三款鼠标：',
-  bargain: '理解您的想法，目前这款已经是活动价了，不过我们可以赠送一个鼠标垫作为赠品。',
+  priceRange: 'L1系列公开零售价为399元至599元，您的预算大概是多少呢？',
+  recommend: '根据您的需求，我会从知识库现有型号中给出匹配方案：',
+  bargain: '理解您的想法。优惠必须遵守价格底线，当前页面不能承诺未确认的折扣或赠品。',
   expensive: '如果觉得这款价格稍高，我可以为您推荐一些性价比更高的选择。',
   better: '您的眼光很好！如果追求更高性能，我们还有旗舰款可以考虑。',
   thanks: '感谢您的咨询，有任何问题随时可以联系我们。',
-  transferHuman: '已为您转接人工客服，请问还有其他可以帮您的吗？'
+  transferHuman: '当前版本暂未接入人工客服转接，请通过正式销售渠道咨询。'
 };
 
 // 常见问题快捷入口
@@ -106,4 +87,4 @@ export const quickQuestions = [
 export const scenarioTags = ['办公', '游戏', '便携', '按预算'];
 
 // 价格区间
-export const priceRanges = ['150元内', '150~400元', '400元以上'];
+export const priceRanges = ['400元内', '400~600元', '600元以上'];
