@@ -3,6 +3,7 @@ import { ShoppingCart, Headphones } from 'lucide-react';
 
 /**
  * 商品推荐卡片组件
+ * 雷龙品牌 - 赛博朋克紫色主题
  * 展示单款鼠标的核心信息和操作按钮
  */
 const ProductCard = ({ product, showActions = true, onBuy, onHuman }) => {
@@ -99,12 +100,17 @@ export const ProductRecommendGroup = ({ products, onSelect }) => {
   
   return (
     <div className="w-full">
-      <div className="mb-2 text-sm text-gray-600">为您推荐以下方案：</div>
+      <div className="mb-3 flex items-center gap-2">
+        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
+          <Zap className="w-3 h-3 text-white" />
+        </div>
+        <span className="text-sm text-gray-300 font-medium">为您推荐以下方案</span>
+      </div>
       <div className="flex gap-3 flex-wrap">
         {products.slice(0, 3).map((product, index) => (
           <div key={product.id} className="relative">
             {labels[index] && (
-              <div className="absolute -top-2 -right-2 bg-accent text-white text-xs px-2 py-0.5 rounded-full z-10">
+              <div className="absolute -top-2 -right-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-[10px] px-2 py-1 rounded-full z-10 shadow-lg shadow-violet-500/30 font-medium">
                 {labels[index]}
               </div>
             )}

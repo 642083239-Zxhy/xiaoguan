@@ -2,8 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+
 :root {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 body {
@@ -17,27 +19,77 @@ body {
   min-height: 100vh;
 }
 
+/* 动态背景 - 雷龙紫色主题 */
+.dragon-bg {
+  background: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 50, 255, 0.25), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(200, 100, 255, 0.15), transparent),
+    radial-gradient(ellipse 50% 50% at 20% 60%, rgba(0, 180, 255, 0.08), transparent),
+    linear-gradient(180deg, #08080F 0%, #0A0A12 50%, #08080F 100%);
+}
+
+/* 背景网格 - 紫色科技风 */
+.cyber-grid-bg {
+  background-image: 
+    linear-gradient(rgba(139, 92, 246, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+/* 浮动光珠效果 */
+.floating-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.5;
+  animation: float 20s ease-in-out infinite;
+}
+
+.floating-orb:nth-child(1) {
+  width: 400px;
+  height: 400px;
+  background: linear-gradient(135deg, #8B5CF6, #C084FC);
+  top: -100px;
+  right: -100px;
+  animation-delay: 0s;
+}
+
+.floating-orb:nth-child(2) {
+  width: 300px;
+  height: 300px;
+  background: linear-gradient(135deg, #06B6D4, #8B5CF6);
+  bottom: -50px;
+  left: -50px;
+  animation-delay: -10s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -30px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+}
+
 /* 自定义滚动条 */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #0A0A0F;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: linear-gradient(180deg, #8B5CF680, #C084FC80);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: linear-gradient(180deg, #8B5CF6, #C084FC);
 }
 
-/* 打字机效果光标 */
+/* 打字机光标闪烁 */
 @keyframes blink {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }
@@ -47,11 +99,11 @@ body {
   animation: blink 1s infinite;
 }
 
-/* 消息动画 */
+/* 消息入场动画 */
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -60,7 +112,7 @@ body {
 }
 
 .message-enter {
-  animation: fadeInUp 0.3s ease-out;
+  animation: fadeInUp 0.35s ease-out;
 }
 
 /* 加载点动画 */
