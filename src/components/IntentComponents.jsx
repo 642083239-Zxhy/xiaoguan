@@ -11,7 +11,7 @@ import { ProductCard } from './ProductCard';
 // 1. 选购咨询 - 展示场景、预算快捷选项
 export const SelectionConsultation = ({ onSelectScene, onSelectBudget, onSelectDevice, missingFields = [] }) => {
   const scenes = ['办公', '游戏', '设计', '便携'];
-  const budgets = ['400元内', '400~600元', '600元以上'];
+  const budgets = ['400元内', '600元以上'];
   
   return (
     <div className="space-y-3">
@@ -304,7 +304,7 @@ export const PriceInquiry = ({ product, products = [], priceType, quote }) => {
 };
 
 // 7. 议价优惠 - 显示优惠说明或审批提示
-export const BargainPrompt = ({ message, isApproving, quote }) => {
+export const BargainPrompt = ({ message, isApproving, quote, onTransferHuman }) => {
   return (
     <div className="bg-gradient-to-br from-[#1A1A2E] to-[#141428] border border-violet-500/20 rounded-2xl p-4">
       {isApproving ? (
@@ -318,8 +318,14 @@ export const BargainPrompt = ({ message, isApproving, quote }) => {
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-gray-700">{message}</p>
-          <p className="text-xs text-gray-500">当前版本不接入人工审批，也不会承诺未确认优惠。</p>
+          <p className="text-xs text-gray-500">理解你对价格的关注。超出公开规则的优惠需要人工确认，当前页面不会承诺未确认优惠。</p>
           <QuoteAudit quote={quote} />
+          <button
+            onClick={onTransferHuman}
+            className="w-full rounded-xl border border-violet-500/30 bg-violet-500/10 py-2.5 text-sm text-violet-300 transition hover:border-violet-400/60 hover:bg-violet-500/15"
+          >
+            申请转人工确认
+          </button>
         </div>
       )}
     </div>
@@ -456,7 +462,7 @@ export const ComplaintHandling = ({ onTransferHuman }) => {
             onClick={onTransferHuman}
             className="w-full bg-gradient-to-r from-red-500 to-pink-500 text-white py-2.5 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-red-500/25 transition-all"
           >
-            立即转接人工客服
+            申请转人工处理
           </button>
         </div>
       </div>

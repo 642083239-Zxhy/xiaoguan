@@ -30,7 +30,6 @@ test('百炼自定义变量包含数据库上下文和当前轮条件', () => {
     },
     message: '现在预算600元，L1 Pro适合吗？',
     currentCriteria: { budget: 600, device: 'Windows' },
-    productCatalog: [{ id: 'L1PRO', price: 599 }],
     analytics: { purchaseClicks: 2, contactClicks: 1 },
     currentTime: new Date('2026-08-06T02:00:00Z')
   });
@@ -52,5 +51,5 @@ test('百炼自定义变量包含数据库上下文和当前轮条件', () => {
   const behavior = JSON.parse(params.behavior_data);
   assert.equal(behavior.purchase_link_clicks, 2);
   assert.equal(behavior.database_context_available, true);
-  assert.equal(JSON.parse(params.product_catalog)[0].id, 'L1PRO');
+  assert.equal(Object.hasOwn(params, 'product_catalog'), false);
 });

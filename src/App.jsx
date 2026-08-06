@@ -14,7 +14,7 @@ import {
   saveSession,
   sendMessageToAI
 } from './services/api';
-import { trackConversion, trackSession } from './services/dataStore';
+import { clearDeprecatedKnowledgeData, trackConversion, trackSession } from './services/dataStore';
 import {
   clearMemoryHistory,
   deleteMemorySession,
@@ -50,6 +50,10 @@ function App() {
   const [currentCriteria, setCurrentCriteria] = useState({});
   const [candidates, setCandidates] = useState([]);
   const [lastAnalysis, setLastAnalysis] = useState(null);
+
+  useEffect(() => {
+    clearDeprecatedKnowledgeData();
+  }, []);
 
   useEffect(() => {
     const historySessions = getHistorySessions();
@@ -146,6 +150,7 @@ function App() {
           criteria: nextCriteria,
           candidates: nextCandidates,
           analysis,
+          responseIntent: response.intent,
           quote: response.quote,
           summary: {
             user_goal: { query: content, intent: analysis?.primary_intent || 'unknown' },
@@ -155,7 +160,10 @@ function App() {
               candidates: nextCandidates.map(item => item.name),
               quote: response.quote || null
             },
-            unresolved_questions: analysis?.next_action === '追问' ? ['预算或使用条件仍需确认'] : []
+            unresolved_questions: analysis?.next_action === '追问' ? ['预算或使用条件仍需确认'] : [],
+            knowledge_source_version: response.source === 'knowledge-base'
+              ? 'bailian-knowledge-base'
+              : 'system-no-knowledge'
           }
         }))
         .then(() => setMemoryStatus('connected'))
@@ -199,24 +207,14 @@ function App() {
         break;
       case 'buy_now':
         trackConversion('purchase', currentSessionId);
-        setMessages(previous => [...previous, {
-          type: 'ai',
-          responseType: 'text',
-          content: `${payload?.name || '所选商品'}暂未配置正式购买链接，当前版本不会生成虚假地址。`,
-          time: nowTime()
-        }]);
+        handleSendMessage(payload?.name ? `我想购买${payload.name}` : '我想购买推荐的商品');
         break;
       case 'contact_human':
       case 'transfer_human':
       case 'call_human':
       case 'chat_human':
         trackConversion('contact', currentSessionId);
-        setMessages(previous => [...previous, {
-          type: 'ai',
-          responseType: 'text',
-          content: '当前版本暂未接入人工转接，不会显示虚假的排队状态或联系电话。',
-          time: nowTime()
-        }]);
+        handleSendMessage('我需要联系人工顾问');
         break;
       case 'contact_enterprise':
         trackConversion('contact', currentSessionId);
@@ -232,7 +230,7 @@ function App() {
           type: 'ai',
           responseType: 'text',
           content: '已清空当前选购条件，你可以重新输入预算、场景或型号。',
-          source: 'rule-engine',
+          source: 'system',
           time: nowTime()
         }]);
         break;
@@ -297,7 +295,7 @@ function App() {
       />
 
       <main className="relative z-10 mt-16 px-0 py-0 lg:px-4 lg:py-4">
-        <div className="glass-dark neon-border mx-auto h-[calc(100vh-64px)] max-w-6xl overflow-hidden lg:h-[calc(100vh-96px)] lg:rounded-3xl">
+        <div className="chat-shell neon-border mx-auto h-[calc(100vh-64px)] max-w-6xl overflow-hidden lg:h-[calc(100vh-96px)] lg:rounded-3xl">
           <ChatArea
             messages={isLoading ? [...messages, { type: 'loading' }] : messages}
             onSendMessage={handleSendMessage}
@@ -306,6 +304,7 @@ function App() {
             currentCriteria={currentCriteria}
             candidateCount={candidates.length}
             apiConfigured={apiConfigured}
+            onGoHome={handleNewSession}
           />
         </div>
       </main>

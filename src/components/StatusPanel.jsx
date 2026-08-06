@@ -30,16 +30,16 @@ const StatusPanel = ({ currentCriteria, candidates, lastAnalysis, onRemoveCriter
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* 遮罩层 */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/70 backdrop-blur-md"
         onClick={onClose}
       />
-      
+
       {/* 侧边栏 */}
       <div className="relative w-80 bg-gradient-to-br from-[#1A1A2E] to-[#141428] border-l border-violet-500/20 h-full flex flex-col shadow-2xl">
         {/* 顶部装饰 */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/60 to-transparent" />
-        
+
         {/* 头部 */}
         <div className="p-4 border-b border-violet-500/10">
           <div className="flex items-center justify-between">
@@ -49,7 +49,7 @@ const StatusPanel = ({ currentCriteria, candidates, lastAnalysis, onRemoveCriter
               </div>
               <h2 className="text-base font-bold text-white font-display tracking-wider">选购状态</h2>
             </div>
-            <button 
+            <button
               onClick={onClose}
               className="p-1.5 hover:bg-violet-500/10 rounded-lg text-gray-400 hover:text-violet-300 transition-all"
             >
@@ -81,14 +81,14 @@ const StatusPanel = ({ currentCriteria, candidates, lastAnalysis, onRemoveCriter
             </div>
           )}
         </div>
-        
+
         {/* 当前选购条件 */}
         <div className="p-4 border-b border-violet-500/10">
           <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-1.5">
             <Tag className="w-4 h-4 text-violet-400" />
             当前选购条件
           </h3>
-          
+
           {Object.keys(currentCriteria).length === 0 ? (
             <div className="text-center py-4">
               <div className="w-12 h-12 mx-auto mb-2 rounded-xl bg-violet-500/10 flex items-center justify-center border border-violet-500/20">
@@ -109,7 +109,7 @@ const StatusPanel = ({ currentCriteria, candidates, lastAnalysis, onRemoveCriter
                       </div>
                     </div>
                     {onRemoveCriteria && (
-                      <button 
+                      <button
                         onClick={() => onRemoveCriteria(key)}
                         className="p-1 hover:bg-red-500/10 rounded text-gray-500 hover:text-red-400 transition-all"
                       >
@@ -120,7 +120,7 @@ const StatusPanel = ({ currentCriteria, candidates, lastAnalysis, onRemoveCriter
                 )
               ))}
               {onRemoveCriteria && Object.keys(currentCriteria).length > 0 && (
-                <button 
+                <button
                   onClick={onClearCandidates}
                   className="text-xs text-gray-500 hover:text-red-400 mt-2 transition-colors"
                 >
@@ -130,7 +130,7 @@ const StatusPanel = ({ currentCriteria, candidates, lastAnalysis, onRemoveCriter
             </div>
           )}
         </div>
-        
+
         {/* 候选商品列表 */}
         <div className="flex-1 overflow-y-auto p-4 scroll-container">
           <div className="flex items-center justify-between mb-3">
@@ -142,7 +142,7 @@ const StatusPanel = ({ currentCriteria, candidates, lastAnalysis, onRemoveCriter
               {candidates?.length || 0} 款
             </span>
           </div>
-          
+
           {!candidates || candidates.length === 0 ? (
             <div className="text-center py-8">
               <div className="w-14 h-14 mx-auto mb-3 rounded-xl bg-fuchsia-500/10 flex items-center justify-center border border-fuchsia-500/20">
@@ -156,7 +156,7 @@ const StatusPanel = ({ currentCriteria, candidates, lastAnalysis, onRemoveCriter
               {candidates.map((candidate) => {
                 const status = candidatesStatus[candidate.status] || candidatesStatus.available;
                 return (
-                  <div 
+                  <div
                     key={candidate.id}
                     className="bg-gradient-to-r from-violet-500/5 to-fuchsia-500/5 border border-violet-500/10 rounded-xl p-3 hover:border-violet-500/30 transition-all"
                   >

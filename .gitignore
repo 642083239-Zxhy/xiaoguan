@@ -23,6 +23,10 @@ XGshujuku/data/
 *.db-shm
 *.db-wal
 
+# 本地归档和设计验收产物
+AI鼠标销售智能体_*.zip
+design-qa.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

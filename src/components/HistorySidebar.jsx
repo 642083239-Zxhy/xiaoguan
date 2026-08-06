@@ -5,30 +5,30 @@ import { Plus, Trash2, MessageSquare, Clock, Zap, X } from 'lucide-react';
  * 历史记录侧边栏组件
  * 雷龙品牌 - 赛博朋克紫色主题
  */
-const HistorySidebar = ({ 
-  isOpen, 
-  onClose, 
-  sessions, 
-  onSelectSession, 
+const HistorySidebar = ({
+  isOpen,
+  onClose,
+  sessions,
+  onSelectSession,
   onDeleteSession,
   onClearHistory,
-  onNewSession 
+  onNewSession
 }) => {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex">
       {/* 遮罩层 */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/70 backdrop-blur-md"
         onClick={onClose}
       />
-      
+
       {/* 侧边栏 */}
       <div className="relative w-72 bg-gradient-to-br from-[#1A1A2E] to-[#141428] border-r border-violet-500/20 h-full flex flex-col shadow-2xl">
         {/* 顶部装饰 */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/60 to-transparent" />
-        
+
         {/* 头部 */}
         <div className="p-4 border-b border-violet-500/10">
           <div className="flex items-center justify-between mb-4">
@@ -38,14 +38,14 @@ const HistorySidebar = ({
               </div>
               <h2 className="text-base font-bold text-white font-display tracking-wider">历史对话</h2>
             </div>
-            <button 
+            <button
               onClick={onClose}
               className="p-1.5 hover:bg-violet-500/10 rounded-lg text-gray-400 hover:text-violet-300 transition-all"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
-          
+
           <button
             onClick={onNewSession}
             className="cyber-btn w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white py-2.5 rounded-xl font-medium hover:shadow-lg hover:shadow-violet-500/25 transition-all"
@@ -54,7 +54,7 @@ const HistorySidebar = ({
             新建对话
           </button>
         </div>
-        
+
         {/* 会话列表 */}
         <div className="flex-1 overflow-y-auto p-3 scroll-container">
           {sessions.length === 0 ? (
@@ -99,7 +99,7 @@ const HistorySidebar = ({
             </div>
           )}
         </div>
-        
+
         {/* 底部提示 */}
         <div className="space-y-2 border-t border-gray-100 p-3 text-center text-xs text-gray-400">
           <p>匿名记录仅保留7天，数据保存在当前浏览器</p>
